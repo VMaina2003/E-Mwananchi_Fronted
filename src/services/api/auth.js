@@ -57,6 +57,16 @@ api.interceptors.response.use(
   }
 );
 
+// Helper function to handle successful authentication
+const handleAuthSuccess = (response) => {
+  if (response.data.access && response.data.refresh) {
+    localStorage.setItem('access_token', response.data.access);
+    localStorage.setItem('refresh_token', response.data.refresh);
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+  }
+  return response.data;
+};
+
 // API functions
 export const authAPI = {
   register: async (userData) => {
@@ -66,14 +76,28 @@ export const authAPI = {
 
   login: async (credentials) => {
     const response = await api.post('/login/', credentials);
-    
-    if (response.data.access && response.data.refresh) {
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    }
-    
-    return response.data;
+    return handleAuthSuccess(response);
+  },
+
+  // Google OAuth
+  googleAuth: async (data) => {
+    const response = await api.post('/google/', data);
+    return handleAuthSuccess(response);
+  },
+
+  // Apple OAuth
+  appleAuth: async (data) => {
+    const response = await api.post('/apple/', data);
+    return handleAuthSuccess(response);
+  },
+
+  // Social auth with access token (generic)
+  socialAuth: async (provider, accessToken) => {
+    const response = await api.post('/social/', {
+      provider,
+      access_token: accessToken
+    });
+    return handleAuthSuccess(response);
   },
 
   logout: async () => {
@@ -120,6 +144,12 @@ export const authAPI = {
     const response = await api.get('/me/');
     return response.data;
   },
+
+  // Verify token validity
+  verifyToken: async () => {
+    const response = await api.get('/verify-token/');
+    return response.data;
+  }
 };
 
 export default api;
