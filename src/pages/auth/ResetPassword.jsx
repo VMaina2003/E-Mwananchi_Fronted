@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
@@ -16,6 +17,7 @@ const ResetPassword = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   
   const { resetPassword, loading } = useAuth();
+  const { showSuccess, showError } = useNotification();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -23,7 +25,6 @@ const ResetPassword = () => {
       ...prev,
       [name]: value
     }));
-    // Clear field errors when user starts typing
     if (fieldErrors[name]) {
       setFieldErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -38,7 +39,9 @@ const ResetPassword = () => {
     const token = searchParams.get('token');
     
     if (!token) {
-      setMessage('Invalid reset link. Please request a new password reset.');
+      const errorMessage = 'Invalid reset link. Please request a new password reset.';
+      setMessage(errorMessage);
+      showError(errorMessage);
       return;
     }
 
@@ -47,52 +50,58 @@ const ResetPassword = () => {
       return;
     }
 
-    const result = await resetPassword(
-      token, 
-      formData.new_password, 
-      formData.confirm_password
-    );
-    
-    if (result.success) {
-      setIsSuccess(true);
-      setMessage('Password reset successfully! You can now login with your new password.');
+    try {
+      const result = await resetPassword(
+        token, 
+        formData.new_password, 
+        formData.confirm_password
+      );
       
-      // Redirect to login after 3 seconds
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
-    } else {
-      setIsSuccess(false);
-      
-      // Handle field-specific errors
-      if (result.error && typeof result.error === 'object') {
-        const errors = result.error;
+      if (result.success) {
+        setIsSuccess(true);
+        const successMessage = 'Password reset successfully! You can now login with your new password.';
+        setMessage(successMessage);
+        showSuccess(successMessage);
         
-        // Handle password validation errors
-        if (errors.new_password) {
-          setFieldErrors({ 
-            new_password: Array.isArray(errors.new_password) 
-              ? errors.new_password.join(' ') 
-              : errors.new_password 
-          });
-        }
-        // Handle token errors
-        else if (errors.token) {
-          setMessage(errors.token);
-        }
-        // Handle confirm password errors
-        else if (errors.confirm_password) {
-          setFieldErrors({ confirm_password: errors.confirm_password });
-        }
-        // Handle generic detail errors
-        else if (errors.detail) {
-          setMessage(errors.detail);
-        } else {
-          setMessage('Failed to reset password. Please check your input.');
-        }
+        setTimeout(() => {
+          navigate('/login');
+        }, 3000);
       } else {
-        setMessage(result.error.detail || 'Failed to reset password. The link may have expired.');
+        setIsSuccess(false);
+        
+        if (result.error && typeof result.error === 'object') {
+          const errors = result.error;
+          
+          if (errors.new_password) {
+            setFieldErrors({ 
+              new_password: Array.isArray(errors.new_password) 
+                ? errors.new_password.join(' ') 
+                : errors.new_password 
+            });
+          } else if (errors.token) {
+            setMessage(errors.token);
+            showError(errors.token);
+          } else if (errors.confirm_password) {
+            setFieldErrors({ confirm_password: errors.confirm_password });
+          } else if (errors.detail) {
+            setMessage(errors.detail);
+            showError(errors.detail);
+          } else {
+            const errorMessage = 'Failed to reset password. Please check your input.';
+            setMessage(errorMessage);
+            showError(errorMessage);
+          }
+        } else {
+          const errorMessage = result.error?.detail || 'Failed to reset password. The link may have expired.';
+          setMessage(errorMessage);
+          showError(errorMessage);
+        }
       }
+    } catch (error) {
+      setIsSuccess(false);
+      const errorMessage = 'An unexpected error occurred. Please try again.';
+      setMessage(errorMessage);
+      showError(errorMessage);
     }
   };
 

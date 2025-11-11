@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import Layout from '../../components/common/Layout';
 import reportService from '../../services/api/reportService'; 
 
@@ -8,12 +9,11 @@ const ReportDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     fetchReport();
@@ -22,7 +22,6 @@ const ReportDetail = () => {
   const fetchReport = async () => {
     try {
       setLoading(true);
-      setError('');
       
       const data = await reportService.getReport(id);
       console.log('Full Report Data:', data);
@@ -34,13 +33,13 @@ const ReportDetail = () => {
       console.error('Error response:', err.response?.data);
       
       if (err.response?.status === 404) {
-        setError('Report not found');
+        showError('Report not found', 'Report Error');
       } else if (err.response?.status === 401) {
-        setError('Please log in to view report details');
+        showError('Please log in to view report details', 'Authentication Required');
       } else if (err.response?.status === 403) {
-        setError('You do not have permission to view this report');
+        showError('You do not have permission to view this report', 'Access Denied');
       } else {
-        setError('Failed to load report. Please try again.');
+        showError('Failed to load report. Please try again.', 'Loading Error');
       }
     } finally {
       setLoading(false);
@@ -56,12 +55,10 @@ const ReportDetail = () => {
       const updatedReport = await reportService.updateReportStatus(id, selectedStatus);
       setReport(updatedReport);
       
-      setSuccessMessage('Status updated successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      showSuccess('Status updated successfully!', 'Report Updated');
     } catch (err) {
       console.error('Status update failed:', err);
-      setError(err.response?.data?.detail || 'Failed to update status');
-      setTimeout(() => setError(''), 3000);
+      showError(err.response?.data?.detail || 'Failed to update status', 'Update Error');
     } finally {
       setUpdatingStatus(false);
     }
@@ -245,20 +242,17 @@ const ReportDetail = () => {
     );
   }
 
-  if (error || !report) {
+  if (!report) {
     return (
       <Layout>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center max-w-md mx-auto">
             <div className="text-6xl mb-4">❌</div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              {error || 'Report Not Found'}
+              Report Not Found
             </h2>
             <p className="text-gray-600 mb-6">
-              {error.includes('log in') 
-                ? 'Please log in to view this report details.'
-                : 'The report you\'re looking for doesn\'t exist or you don\'t have permission to view it.'
-              }
+              The report you're looking for doesn't exist or you don't have permission to view it.
             </p>
             <div className="flex gap-4 justify-center">
               <button
@@ -267,14 +261,6 @@ const ReportDetail = () => {
               >
                 Back to Reports
               </button>
-              {error.includes('log in') && (
-                <button
-                  onClick={() => navigate('/login')}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                >
-                  Login
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -286,18 +272,6 @@ const ReportDetail = () => {
     <Layout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Success/Error Messages */}
-          {successMessage && (
-            <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
-              {successMessage}
-            </div>
-          )}
-          {error && (
-            <div className="fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
-              {error}
-            </div>
-          )}
-
           {/* Header */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
             <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-6">

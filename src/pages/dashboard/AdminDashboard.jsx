@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useNotification } from '../../context/NotificationContext';
 import Header from '../../components/common/Header';
 import Footer from '../../components/common/Footer';
 import reportService from '../../services/api/reportService';
@@ -33,6 +34,7 @@ const STATUS_COLORS = {
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(TABS.OVERVIEW);
   const [stats, setStats] = useState({
@@ -95,10 +97,11 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error('Failed to load admin data:', err);
       setError('Failed to load dashboard data. Please try again.');
+      showError('Failed to load dashboard data. Please try again.', 'Loading Error');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, showError]);
 
   useEffect(() => {
     loadAdminData();
@@ -111,16 +114,20 @@ const AdminDashboard = () => {
       switch (action) {
         case 'activate':
           await userService.activateUser(userId);
+          showSuccess('User activated successfully', 'User Management');
           break;
         case 'deactivate':
           await userService.deactivateUser(userId);
+          showSuccess('User deactivated successfully', 'User Management');
           break;
         case 'update_role':
           await userService.updateUserRole(userId, data.role);
+          showSuccess('User role updated successfully', 'User Management');
           break;
         case 'delete':
           if (window.confirm('Are you sure you want to delete this user?')) {
             await userService.deleteUser(userId);
+            showSuccess('User deleted successfully', 'User Management');
           }
           break;
         default:
@@ -130,7 +137,9 @@ const AdminDashboard = () => {
       await loadAdminData();
     } catch (err) {
       console.error('User action failed:', err);
-      setError(`Failed to ${action} user: ${err.response?.data?.detail || err.message}`);
+      const errorMessage = `Failed to ${action} user: ${err.response?.data?.detail || err.message}`;
+      setError(errorMessage);
+      showError(errorMessage, 'Action Failed');
     } finally {
       setActionLoading(prev => ({ ...prev, [userId]: false }));
     }
@@ -144,10 +153,12 @@ const AdminDashboard = () => {
         case 'delete':
           if (window.confirm('Are you sure you want to delete this report?')) {
             await reportService.deleteReport(reportId);
+            showSuccess('Report deleted successfully', 'Report Management');
           }
           break;
         case 'update_status':
           await reportService.updateReportStatus(reportId, data.status);
+          showSuccess('Report status updated successfully', 'Report Updated');
           break;
         default:
           console.warn('Unknown report action:', action);
@@ -156,7 +167,9 @@ const AdminDashboard = () => {
       await loadAdminData();
     } catch (err) {
       console.error('Report action failed:', err);
-      setError(`Failed to ${action} report: ${err.response?.data?.detail || err.message}`);
+      const errorMessage = `Failed to ${action} report: ${err.response?.data?.detail || err.message}`;
+      setError(errorMessage);
+      showError(errorMessage, 'Action Failed');
     } finally {
       setActionLoading(prev => ({ ...prev, [reportId]: false }));
     }
@@ -170,6 +183,7 @@ const AdminDashboard = () => {
         case 'delete':
           if (window.confirm('Are you sure you want to delete this comment?')) {
             await commentService.deleteComment(commentId);
+            showSuccess('Comment deleted successfully', 'Comment Management');
           }
           break;
         default:
@@ -179,7 +193,9 @@ const AdminDashboard = () => {
       await loadAdminData();
     } catch (err) {
       console.error('Comment action failed:', err);
-      setError(`Failed to ${action} comment: ${err.response?.data?.detail || err.message}`);
+      const errorMessage = `Failed to ${action} comment: ${err.response?.data?.detail || err.message}`;
+      setError(errorMessage);
+      showError(errorMessage, 'Action Failed');
     } finally {
       setActionLoading(prev => ({ ...prev, [commentId]: false }));
     }
@@ -193,10 +209,12 @@ const AdminDashboard = () => {
         case 'delete':
           if (window.confirm('Are you sure you want to delete this department?')) {
             await departmentService.deleteDepartment(departmentId);
+            showSuccess('Department deleted successfully', 'Department Management');
           }
           break;
         case 'update':
           await departmentService.updateDepartment(departmentId, data);
+          showSuccess('Department updated successfully', 'Department Management');
           break;
         default:
           console.warn('Unknown department action:', action);
@@ -205,7 +223,9 @@ const AdminDashboard = () => {
       await loadAdminData();
     } catch (err) {
       console.error('Department action failed:', err);
-      setError(`Failed to ${action} department: ${err.response?.data?.detail || err.message}`);
+      const errorMessage = `Failed to ${action} department: ${err.response?.data?.detail || err.message}`;
+      setError(errorMessage);
+      showError(errorMessage, 'Action Failed');
     } finally {
       setActionLoading(prev => ({ ...prev, [departmentId]: false }));
     }

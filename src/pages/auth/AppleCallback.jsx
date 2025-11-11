@@ -1,9 +1,12 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNotification } from '../../context/NotificationContext';
+import { authAPI } from '../../services/api/auth';
 
 const AppleCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { showSuccess, showError } = useNotification();
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -15,50 +18,36 @@ const AppleCallback = () => {
 
       if (error) {
         console.error('Apple Sign In error:', error);
+        showError('Apple sign-in failed. Please try again.');
         navigate('/login?error=apple_oauth_failed');
         return;
       }
 
       if (code || id_token) {
         try {
-          // Send the authorization code to your backend
-          const response = await fetch('http://127.0.0.1:8000/api/auth/apple/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              code, 
-              id_token,
-              user: {} // Apple may provide user info in a separate parameter
-            }),
+          const response = await authAPI.appleAuth({ 
+            code, 
+            id_token,
+            user: {}
           });
-
-          const data = await response.json();
-
-          if (response.ok) {
-            // Save tokens and user data
-            localStorage.setItem('access_token', data.access);
-            localStorage.setItem('refresh_token', data.refresh);
-            localStorage.setItem('user', JSON.stringify(data.user));
-            
-            console.log('Apple Sign In successful:', data);
-            navigate('/dashboard');
-          } else {
-            console.error('Backend error:', data);
-            navigate('/login?error=authentication_failed');
-          }
+          
+          console.log('Apple Sign In successful:', response);
+          showSuccess('Successfully signed in with Apple!');
+          navigate('/dashboard');
         } catch (error) {
           console.error('Apple callback error:', error);
+          const errorMessage = error.response?.data?.detail || 'Server error. Please try again.';
+          showError(errorMessage);
           navigate('/login?error=server_error');
         }
       } else {
+        showError('No authorization data received');
         navigate('/login?error=no_authorization_data');
       }
     };
 
     handleCallback();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, showSuccess, showError]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

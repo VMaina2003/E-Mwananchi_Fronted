@@ -1,6 +1,7 @@
 // src/pages/dashboard/OfficialDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import Header from '../../components/common/Header';
 import Footer from '../../components/common/Footer';
@@ -8,6 +9,7 @@ import reportService from '../../services/api/reportService';
 
 const OfficialDashboard = () => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('pending');
   const [countyReports, setCountyReports] = useState([]);
@@ -35,6 +37,7 @@ const OfficialDashboard = () => {
       setStats(statsData);
     } catch (error) {
       console.error('Failed to load official data:', error);
+      showError('Failed to load dashboard data. Please try again.', 'Loading Error');
     } finally {
       setLoading(false);
     }
@@ -44,11 +47,20 @@ const OfficialDashboard = () => {
     try {
       setUpdatingStatus(reportId);
       await reportService.updateReportStatus(reportId, newStatus);
+      
+      const statusMessages = {
+        'noted': 'Report marked as noted',
+        'on_progress': 'Work started on report',
+        'resolved': 'Report marked as resolved'
+      };
+      
+      showSuccess(statusMessages[newStatus] || 'Status updated successfully', 'Report Updated');
+      
       // Reload data to reflect changes
       await loadOfficialData();
     } catch (error) {
       console.error('Failed to update report status:', error);
-      alert('Failed to update report status. Please try again.');
+      showError('Failed to update report status. Please try again.', 'Update Error');
     } finally {
       setUpdatingStatus(null);
     }

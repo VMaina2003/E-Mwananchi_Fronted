@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 
 const ResendVerification = () => {
   const [email, setEmail] = useState('');
@@ -8,20 +9,32 @@ const ResendVerification = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   
   const { resendVerification, loading } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
 
-    const result = await resendVerification(email);
-    
-    if (result.success) {
-      setIsSuccess(true);
-      setMessage(result.data.detail || 'Verification email sent successfully!');
-    } else {
+    try {
+      const result = await resendVerification(email);
+      
+      if (result.success) {
+        setIsSuccess(true);
+        const successMessage = result.data?.detail || 'Verification email sent successfully!';
+        setMessage(successMessage);
+        showSuccess(successMessage);
+      } else {
+        setIsSuccess(false);
+        const errorMessage = result.error?.detail || 'Failed to send verification email.';
+        setMessage(errorMessage);
+        showError(errorMessage);
+      }
+    } catch (error) {
       setIsSuccess(false);
-      setMessage(result.error.detail || 'Failed to send verification email.');
+      const errorMessage = 'An unexpected error occurred. Please try again.';
+      setMessage(errorMessage);
+      showError(errorMessage);
     }
   };
 

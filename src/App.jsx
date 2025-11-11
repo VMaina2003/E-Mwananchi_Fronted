@@ -1,4 +1,4 @@
-// src/App.jsx
+// src/App.jsx - UPDATED
 import React, { Suspense, lazy } from "react";
 import {
   BrowserRouter as Router,
@@ -7,6 +7,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { NotificationProvider } from "./context/NotificationContext";
 
 // Lazy load components
 const Login = lazy(() => import("./pages/auth/Login"));
@@ -245,49 +246,51 @@ class ErrorBoundary extends React.Component {
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <Router>
-          <div className="App min-h-screen bg-gray-50">
-            <Suspense fallback={<AppLoadingSpinner />}>
-              <Routes>
-                {/* Public Routes - Only accessible when not authenticated */}
-                <Route path={ROUTES.PUBLIC.LOGIN} element={<PublicRoute><Login /></PublicRoute>} />
-                <Route path={ROUTES.PUBLIC.REGISTER} element={<PublicRoute><Register /></PublicRoute>} />
-                <Route path={ROUTES.PUBLIC.VERIFY_EMAIL} element={<PublicRoute><VerifyEmail /></PublicRoute>} />
-                <Route path={ROUTES.PUBLIC.FORGOT_PASSWORD} element={<PublicRoute><ForgotPassword /></PublicRoute>} />
-                <Route path={ROUTES.PUBLIC.RESET_PASSWORD} element={<PublicRoute><ResetPassword /></PublicRoute>} />
-                <Route path={ROUTES.PUBLIC.RESEND_VERIFICATION} element={<PublicRoute><ResendVerification /></PublicRoute>} />
-                <Route path={ROUTES.PUBLIC.APPLE_CALLBACK} element={<PublicRoute><AppleCallback /></PublicRoute>} />
-                <Route path={ROUTES.PUBLIC.GOOGLE_CALLBACK} element={<PublicRoute><GoogleCallback /></PublicRoute>} />
-                
-                {/* Mixed Routes - Accessible to all users */}
-                <Route path={ROUTES.PUBLIC.HOME} element={<MixedRoute><Home /></MixedRoute>} />
-                <Route path={ROUTES.PUBLIC.REPORT_DETAIL} element={<MixedRoute><ReportDetail /></MixedRoute>} />
+      <Router>
+        <NotificationProvider>
+          <AuthProvider>
+            <div className="App min-h-screen bg-gray-50">
+              <Suspense fallback={<AppLoadingSpinner />}>
+                <Routes>
+                  {/* Public Routes - Only accessible when not authenticated */}
+                  <Route path={ROUTES.PUBLIC.LOGIN} element={<PublicRoute><Login /></PublicRoute>} />
+                  <Route path={ROUTES.PUBLIC.REGISTER} element={<PublicRoute><Register /></PublicRoute>} />
+                  <Route path={ROUTES.PUBLIC.VERIFY_EMAIL} element={<PublicRoute><VerifyEmail /></PublicRoute>} />
+                  <Route path={ROUTES.PUBLIC.FORGOT_PASSWORD} element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+                  <Route path={ROUTES.PUBLIC.RESET_PASSWORD} element={<PublicRoute><ResetPassword /></PublicRoute>} />
+                  <Route path={ROUTES.PUBLIC.RESEND_VERIFICATION} element={<PublicRoute><ResendVerification /></PublicRoute>} />
+                  <Route path={ROUTES.PUBLIC.APPLE_CALLBACK} element={<PublicRoute><AppleCallback /></PublicRoute>} />
+                  <Route path={ROUTES.PUBLIC.GOOGLE_CALLBACK} element={<PublicRoute><GoogleCallback /></PublicRoute>} />
+                  
+                  {/* Mixed Routes - Accessible to all users */}
+                  <Route path={ROUTES.PUBLIC.HOME} element={<MixedRoute><Home /></MixedRoute>} />
+                  <Route path={ROUTES.PUBLIC.REPORT_DETAIL} element={<MixedRoute><ReportDetail /></MixedRoute>} />
 
-                {/* NEW: Unified Dashboard Routes */}
-                <Route path={ROUTES.PROTECTED.MAIN_DASHBOARD} element={<ProtectedRoute><MainDashboardRouter /></ProtectedRoute>} />
-                <Route path={ROUTES.PROTECTED.BROWSE_REPORTS} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.ALL_AUTHENTICATED}><ReportsList /></ProtectedRoute>} />
+                  {/* NEW: Unified Dashboard Routes */}
+                  <Route path={ROUTES.PROTECTED.MAIN_DASHBOARD} element={<ProtectedRoute><MainDashboardRouter /></ProtectedRoute>} />
+                  <Route path={ROUTES.PROTECTED.BROWSE_REPORTS} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.ALL_AUTHENTICATED}><ReportsList /></ProtectedRoute>} />
 
-                {/* Protected Dashboard Routes */}
-                <Route path={ROUTES.PROTECTED.DASHBOARD} element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
-                <Route path={ROUTES.PROTECTED.CITIZEN_DASHBOARD} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.CITIZEN}><CitizenDashboard /></ProtectedRoute>} />
-                <Route path={ROUTES.PROTECTED.OFFICIAL_DASHBOARD} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.OFFICIAL}><OfficialDashboard /></ProtectedRoute>} />
-                <Route path={ROUTES.PROTECTED.ADMIN_DASHBOARD} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.ADMIN}><AdminDashboard /></ProtectedRoute>} />
+                  {/* Protected Dashboard Routes */}
+                  <Route path={ROUTES.PROTECTED.DASHBOARD} element={<ProtectedRoute><DashboardRouter /></ProtectedRoute>} />
+                  <Route path={ROUTES.PROTECTED.CITIZEN_DASHBOARD} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.CITIZEN}><CitizenDashboard /></ProtectedRoute>} />
+                  <Route path={ROUTES.PROTECTED.OFFICIAL_DASHBOARD} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.OFFICIAL}><OfficialDashboard /></ProtectedRoute>} />
+                  <Route path={ROUTES.PROTECTED.ADMIN_DASHBOARD} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.ADMIN}><AdminDashboard /></ProtectedRoute>} />
 
-                {/* Protected Feature Routes */}
-                <Route path={ROUTES.PROTECTED.CREATE_REPORT} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.ALL_AUTHENTICATED}><CreateReport /></ProtectedRoute>} />
-                <Route path={ROUTES.PROTECTED.MY_REPORTS} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.ALL_AUTHENTICATED}><CitizenDashboard /></ProtectedRoute>} />
+                  {/* Protected Feature Routes */}
+                  <Route path={ROUTES.PROTECTED.CREATE_REPORT} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.ALL_AUTHENTICATED}><CreateReport /></ProtectedRoute>} />
+                  <Route path={ROUTES.PROTECTED.MY_REPORTS} element={<ProtectedRoute requiredRoles={ROLE_CONFIG.ALL_AUTHENTICATED}><CitizenDashboard /></ProtectedRoute>} />
 
-                {/* Default route */}
-                <Route path="/" element={<Navigate to={ROUTES.PUBLIC.HOME} replace />} />
-                
-                {/* Catch all route - 404 */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </div>
-        </Router>
-      </AuthProvider>
+                  {/* Default route */}
+                  <Route path="/" element={<Navigate to={ROUTES.PUBLIC.HOME} replace />} />
+                  
+                  {/* Catch all route - 404 */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </div>
+          </AuthProvider>
+        </NotificationProvider>
+      </Router>
     </ErrorBoundary>
   );
 }

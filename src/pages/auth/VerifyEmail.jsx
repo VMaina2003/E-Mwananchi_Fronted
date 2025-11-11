@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authAPI } from '../../services/api/auth';
+import { useNotification } from '../../context/NotificationContext';
 
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [status, setStatus] = useState('verifying'); // verifying, success, error
+  const [status, setStatus] = useState('verifying');
   const [message, setMessage] = useState('');
+  const { showSuccess, showError } = useNotification();
 
   useEffect(() => {
     const verifyEmail = async () => {
@@ -14,27 +16,32 @@ const VerifyEmail = () => {
       
       if (!token) {
         setStatus('error');
-        setMessage('Verification token is missing.');
+        const errorMessage = 'Verification token is missing.';
+        setMessage(errorMessage);
+        showError(errorMessage);
         return;
       }
 
       try {
         const response = await authAPI.verifyEmail(token);
         setStatus('success');
-        setMessage(response.detail || 'Email verified successfully!');
+        const successMessage = response.detail || 'Email verified successfully!';
+        setMessage(successMessage);
+        showSuccess(successMessage);
         
-        // Redirect to login after 3 seconds
         setTimeout(() => {
           navigate('/login');
         }, 3000);
       } catch (error) {
         setStatus('error');
-        setMessage(error.response?.data?.detail || 'Verification failed. Please try again.');
+        const errorMessage = error.response?.data?.detail || 'Verification failed. Please try again.';
+        setMessage(errorMessage);
+        showError(errorMessage);
       }
     };
 
     verifyEmail();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, showSuccess, showError]);
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">

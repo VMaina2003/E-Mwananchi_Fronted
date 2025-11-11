@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -8,20 +9,32 @@ const ForgotPassword = () => {
   const [isSuccess, setIsSuccess] = useState(false);
   
   const { requestPasswordReset, loading } = useAuth();
+  const { showSuccess, showError } = useNotification();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
 
-    const result = await requestPasswordReset(email);
-    
-    if (result.success) {
-      setIsSuccess(true);
-      setMessage('If an account with that email exists, a password reset link has been sent.');
-    } else {
+    try {
+      const result = await requestPasswordReset(email);
+      
+      if (result.success) {
+        setIsSuccess(true);
+        const successMessage = 'If an account with that email exists, a password reset link has been sent.';
+        setMessage(successMessage);
+        showSuccess(successMessage);
+      } else {
+        setIsSuccess(false);
+        const errorMessage = result.error?.detail || 'Failed to send password reset email.';
+        setMessage(errorMessage);
+        showError(errorMessage);
+      }
+    } catch (error) {
       setIsSuccess(false);
-      setMessage(result.error.detail || 'Failed to send password reset email.');
+      const errorMessage = 'An unexpected error occurred. Please try again.';
+      setMessage(errorMessage);
+      showError(errorMessage);
     }
   };
 

@@ -1,9 +1,12 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNotification } from '../../context/NotificationContext';
+import { authAPI } from '../../services/api/auth';
 
 const GoogleCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { showSuccess, showError } = useNotification();
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -14,46 +17,47 @@ const GoogleCallback = () => {
 
       if (error) {
         console.error('Google OAuth error:', error);
+        showError('Google sign-in failed. Please try again.');
         navigate('/login?error=google_oauth_failed');
         return;
       }
 
       if (code) {
         try {
-          // Send the authorization code to your backend
-          const response = await fetch('http://127.0.0.1:8000/api/auth/google/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ code }),
-          });
-
-          const data = await response.json();
-
-          if (response.ok) {
-            // Save tokens and user data
-            localStorage.setItem('access_token', data.access);
-            localStorage.setItem('refresh_token', data.refresh);
-            localStorage.setItem('user', JSON.stringify(data.user));
-            
-            console.log('Google OAuth successful:', data);
-            navigate('/dashboard');
-          } else {
-            console.error('Backend error:', data);
-            navigate('/login?error=authentication_failed');
-          }
+          console.log('Attempting Google OAuth with code:', code);
+          const response = await authAPI.googleAuth({ code });
+          
+          console.log('Google OAuth successful:', response);
+          showSuccess('Successfully signed in with Google!');
+          navigate('/dashboard');
         } catch (error) {
-          console.error('Google callback error:', error);
+          console.error('Google callback error details:', {
+            message: error.message,
+            response: error.response,
+            code: error.code
+          });
+          
+          let errorMessage = 'Server error. Please try again.';
+          
+          if (error.message === 'Network Error') {
+            errorMessage = 'Cannot connect to server. Please check your internet connection.';
+          } else if (error.response?.data?.detail) {
+            errorMessage = error.response.data.detail;
+          } else if (error.response?.status === 500) {
+            errorMessage = 'Server error. Please try again later.';
+          }
+          
+          showError(errorMessage);
           navigate('/login?error=server_error');
         }
       } else {
+        showError('No authorization code received');
         navigate('/login?error=no_code');
       }
     };
 
     handleCallback();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, showSuccess, showError]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

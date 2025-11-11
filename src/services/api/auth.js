@@ -1,30 +1,54 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/auth';
+// Use environment variables - FIXED: Ensure it includes /auth
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/auth';
+
+console.log('Full API Base URL:', API_BASE_URL); // Debug log
+
+// Validate the API base URL
+if (!API_BASE_URL.includes('/auth')) {
+  console.warn('Warning: API_BASE_URL might be missing /auth path. Current:', API_BASE_URL);
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000,
 });
 
-// Request interceptor
+// Request interceptor with debug logging
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log('Full API Request URL:', config.baseURL + config.url);
+    console.log('API Request Data:', config.data);
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('Request Interceptor Error:', error);
+    return Promise.reject(error);
+  }
 );
 
-// Response interceptor - FIXED VERSION
+// Response interceptor with better error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API Response Success:', response.status, response.config.url);
+    return response;
+  },
   async (error) => {
+    console.error('API Response Error Details:', {
+      status: error.response?.status,
+      url: error.config?.baseURL + error.config?.url,
+      message: error.message,
+      data: error.response?.data
+    });
+    
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
@@ -62,7 +86,10 @@ const handleAuthSuccess = (response) => {
   if (response.data.access && response.data.refresh) {
     localStorage.setItem('access_token', response.data.access);
     localStorage.setItem('refresh_token', response.data.refresh);
-    localStorage.setItem('user', JSON.stringify(response.data.user));
+    
+    if (response.data.user) {
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
   }
   return response.data;
 };
@@ -91,15 +118,6 @@ export const authAPI = {
     return handleAuthSuccess(response);
   },
 
-  // Social auth with access token (generic)
-  socialAuth: async (provider, accessToken) => {
-    const response = await api.post('/social/', {
-      provider,
-      access_token: accessToken
-    });
-    return handleAuthSuccess(response);
-  },
-
   logout: async () => {
     const refreshToken = localStorage.getItem('refresh_token');
     
@@ -117,7 +135,7 @@ export const authAPI = {
   },
 
   verifyEmail: async (token) => {
-    const response = await api.get(`/verify-email/?token=${token}`);
+    const response = await api.post('/verify-email/', { token });
     return response.data;
   },
 
@@ -145,9 +163,8 @@ export const authAPI = {
     return response.data;
   },
 
-  // Verify token validity
   verifyToken: async () => {
-    const response = await api.get('/verify-token/');
+    const response = await api.get('/token/verify/');
     return response.data;
   }
 };
