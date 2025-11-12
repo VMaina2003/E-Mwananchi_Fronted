@@ -2,38 +2,44 @@
 import api from './api';
 
 const dashboardService = {
-  // Main dashboard statistics
-  getDashboardStats: () => {
-    return api.get('/dashboard/stats/overview/');
-  },
-
-  // Recent activity
-  getRecentActivity: (limit = 10) => {
-    return api.get(`/dashboard/stats/recent-activity/?limit=${limit}`);
-  },
-
-  // Role-specific dashboards
-  getCitizenDashboard: () => {
-    return api.get('/dashboard/citizen/');
-  },
-
-  getOfficialDashboard: () => {
-    return api.get('/dashboard/official/');
-  },
-
-  getAdminDashboard: () => {
-    return api.get('/dashboard/admin/');
-  },
-
-  // Reports analytics with filters
-  getReportsAnalytics: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.keys(filters).forEach(key => {
-      if (filters[key]) {
-        params.append(key, filters[key]);
-      }
+  /**
+   * Get professional statistics - uses report stats endpoint
+   */
+  getProfessionalStats: () => api.get('/reports/stats/'),
+  
+  /**
+   * Get recent activity - uses report list with ordering
+   */
+  getRecentActivity: (limit = 10) => api.get(`/reports/?limit=${limit}&ordering=-created_at`),
+  
+  /**
+   * Get citizen dashboard data
+   */
+  getCitizenDashboard: () => api.get('/reports/?ordering=-created_at'),
+  
+  /**
+   * Get official dashboard data
+   */
+  getOfficialDashboard: () => api.get('/reports/?ordering=-created_at'),
+  
+  /**
+   * Get admin dashboard data
+   */
+  getAdminDashboard: () => api.get('/reports/stats/'),
+  
+  /**
+   * Get advanced analytics
+   */
+  getAdvancedAnalytics: (params = {}) => api.get('/reports/stats/', { params }),
+  
+  /**
+   * Export dashboard data
+   */
+  exportDashboardData: (format = 'csv', filters = {}) => {
+    return api.get('/reports/stats/', {
+      params: { format, ...filters },
+      responseType: 'blob'
     });
-    return api.get(`/reports/stats/?${params.toString()}`);
   }
 };
 

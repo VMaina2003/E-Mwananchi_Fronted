@@ -10,7 +10,7 @@ class UserService {
       const response = await api.get('/auth/users/', { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error fetching users:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -23,7 +23,7 @@ class UserService {
       const response = await api.get(`/auth/users/${userId}/`);
       return response.data;
     } catch (error) {
-      console.error(`Error fetching user ${userId}:`, error);
+      console.error(`Error fetching user ${userId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -36,7 +36,7 @@ class UserService {
       const response = await api.patch(`/auth/users/${userId}/`, userData);
       return response.data;
     } catch (error) {
-      console.error(`Error updating user ${userId}:`, error);
+      console.error(`Error updating user ${userId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -49,7 +49,7 @@ class UserService {
       const response = await api.delete(`/auth/users/${userId}/`);
       return response.data;
     } catch (error) {
-      console.error(`Error deleting user ${userId}:`, error);
+      console.error(`Error deleting user ${userId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -62,7 +62,7 @@ class UserService {
       const response = await api.post(`/auth/users/${userId}/activate/`);
       return response.data;
     } catch (error) {
-      console.error(`Error activating user ${userId}:`, error);
+      console.error(`Error activating user ${userId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -75,7 +75,7 @@ class UserService {
       const response = await api.post(`/auth/users/${userId}/deactivate/`);
       return response.data;
     } catch (error) {
-      console.error(`Error deactivating user ${userId}:`, error);
+      console.error(`Error deactivating user ${userId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -85,6 +85,19 @@ class UserService {
    */
   async updateUserRole(userId, role) {
     return this.updateUser(userId, { role });
+  }
+
+  /**
+   * Verify user
+   */
+  async verifyUser(userId) {
+    try {
+      const response = await api.post(`/auth/users/${userId}/verify/`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error verifying user ${userId}:`, error.response?.data || error.message);
+      throw error;
+    }
   }
 }
 

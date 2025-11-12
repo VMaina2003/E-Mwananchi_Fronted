@@ -7,10 +7,10 @@ class NotificationService {
    */
   async getNotifications(params = {}) {
     try {
-      const response = await api.get('/api/notifications/', { params });
+      const response = await api.get('/notifications/', { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('Error fetching notifications:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -20,10 +20,10 @@ class NotificationService {
    */
   async getNotification(notificationId) {
     try {
-      const response = await api.get(`/api/notifications/${notificationId}/`);
+      const response = await api.get(`/notifications/${notificationId}/`);
       return response.data;
     } catch (error) {
-      console.error(`Error fetching notification ${notificationId}:`, error);
+      console.error(`Error fetching notification ${notificationId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -33,10 +33,10 @@ class NotificationService {
    */
   async markAsRead(notificationId) {
     try {
-      const response = await api.post(`/api/notifications/${notificationId}/mark-read/`);
+      const response = await api.post(`/notifications/${notificationId}/mark-read/`);
       return response.data;
     } catch (error) {
-      console.error(`Error marking notification ${notificationId} as read:`, error);
+      console.error(`Error marking notification ${notificationId} as read:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -46,10 +46,10 @@ class NotificationService {
    */
   async markAllAsRead() {
     try {
-      const response = await api.post('/api/notifications/mark-all-read/');
+      const response = await api.post('/notifications/mark-all-read/');
       return response.data;
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      console.error('Error marking all notifications as read:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -59,10 +59,10 @@ class NotificationService {
    */
   async deleteNotification(notificationId) {
     try {
-      const response = await api.delete(`/api/notifications/${notificationId}/`);
+      const response = await api.delete(`/notifications/${notificationId}/`);
       return response.data;
     } catch (error) {
-      console.error(`Error deleting notification ${notificationId}:`, error);
+      console.error(`Error deleting notification ${notificationId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -72,10 +72,10 @@ class NotificationService {
    */
   async createNotification(notificationData) {
     try {
-      const response = await api.post('/api/notifications/', notificationData);
+      const response = await api.post('/notifications/', notificationData);
       return response.data;
     } catch (error) {
-      console.error('Error creating notification:', error);
+      console.error('Error creating notification:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -85,10 +85,10 @@ class NotificationService {
    */
   async getNotificationStats() {
     try {
-      const response = await api.get('/api/notifications/stats/');
+      const response = await api.get('/notifications/stats/');
       return response.data;
     } catch (error) {
-      console.error('Error fetching notification stats:', error);
+      console.error('Error fetching notification stats:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -98,10 +98,10 @@ class NotificationService {
    */
   async getUnreadCount() {
     try {
-      const response = await api.get('/api/notifications/unread-count/');
+      const response = await api.get('/notifications/unread-count/');
       return response.data;
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      console.error('Error fetching unread count:', error.response?.data || error.message);
       throw error;
     }
   }

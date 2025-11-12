@@ -7,10 +7,10 @@ class CommentService {
    */
   async getComments(params = {}) {
     try {
-      const response = await api.get('/comments/comments', { params });
+      const response = await api.get('/comments/comments/', { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching comments:', error);
+      console.error('Error fetching comments:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -20,12 +20,12 @@ class CommentService {
    */
   async getCommentsByReport(reportId) {
     try {
-      const response = await api.get('/comments/comments', { 
+      const response = await api.get('/comments/comments/', { 
         params: { report: reportId } 
       });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching comments for report ${reportId}:`, error);
+      console.error(`Error fetching comments for report ${reportId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -35,10 +35,10 @@ class CommentService {
    */
   async getComment(commentId) {
     try {
-      const response = await api.get(`/comments/comments/${commentId}`);
+      const response = await api.get(`/comments/comments/${commentId}/`);
       return response.data;
     } catch (error) {
-      console.error(`Error fetching comment ${commentId}:`, error);
+      console.error(`Error fetching comment ${commentId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -48,10 +48,10 @@ class CommentService {
    */
   async createComment(commentData) {
     try {
-      const response = await api.post('/comments/comments', commentData);
+      const response = await api.post('/comments/comments/', commentData);
       return response.data;
     } catch (error) {
-      console.error('Error creating comment:', error);
+      console.error('Error creating comment:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -61,10 +61,10 @@ class CommentService {
    */
   async updateComment(commentId, commentData) {
     try {
-      const response = await api.patch(`/comments/${commentId}`, commentData);
+      const response = await api.patch(`/comments/comments/${commentId}/`, commentData);
       return response.data;
     } catch (error) {
-      console.error(`Error updating comment ${commentId}:`, error);
+      console.error(`Error updating comment ${commentId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -74,10 +74,10 @@ class CommentService {
    */
   async deleteComment(commentId) {
     try {
-      const response = await api.delete(`/comments/comments/${commentId}`);
+      const response = await api.delete(`/comments/comments/${commentId}/`);
       return response.data;
     } catch (error) {
-      console.error(`Error deleting comment ${commentId}:`, error);
+      console.error(`Error deleting comment ${commentId}:`, error.response?.data || error.message);
       throw error;
     }
   }
@@ -91,10 +91,10 @@ class CommentService {
       if (reportId) {
         params.report = reportId;
       }
-      const response = await api.get('/comments/comments', { params });
+      const response = await api.get('/comments/comments/', { params });
       return response.data;
     } catch (error) {
-      console.error(`Error fetching comments by type ${commentType}:`, error);
+      console.error(`Error fetching comments by type ${commentType}:`, error.response?.data || error.message);
       throw error;
     }
   }

@@ -1,10 +1,10 @@
+// src/services/api/locationService.js
 import api from './api';
 
 class LocationService {
   async getCounties() {
     try {
       const response = await api.get('/location/counties/');
-      // Handle paginated response
       return response.data.results || response.data || [];
     } catch (error) {
       console.error('Error fetching counties:', error.response?.data || error.message);
@@ -14,7 +14,6 @@ class LocationService {
 
   async getSubcounties(countyId) {
     try {
-      // Use query parameter instead of URL path
       const response = await api.get(`/location/subcounties/?county=${countyId}`);
       return response.data.results || response.data || [];
     } catch (error) {
@@ -25,7 +24,6 @@ class LocationService {
 
   async getWards(subcountyId) {
     try {
-      // Use query parameter instead of URL path
       const response = await api.get(`/location/wards/?subcounty=${subcountyId}`);
       return response.data.results || response.data || [];
     } catch (error) {
@@ -37,8 +35,6 @@ class LocationService {
   async getDepartments() {
     try {
       const response = await api.get('/department/departments/');
-      console.log('Departments API response:', response.data);
-      // Extract the array from paginated response
       return response.data.results || response.data || [];
     } catch (error) {
       console.error('Error fetching departments:', error.response?.data || error.message);
