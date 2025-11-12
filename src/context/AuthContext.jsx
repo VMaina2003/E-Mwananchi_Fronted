@@ -16,6 +16,25 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Helper function to add role properties to user object
+  const enhanceUserWithRoleProperties = (userData) => {
+    if (!userData) return null;
+    
+    return {
+      ...userData,
+      // Add role-based boolean properties for easy checking
+      is_citizen: userData.role === 'citizen',
+      is_county_official: userData.role === 'county_official',
+      is_admin: userData.role === 'admin',
+      is_superadmin: userData.role === 'superadmin',
+      is_viewer: userData.role === 'viewer',
+      
+      // Add convenience methods for role checking
+      hasRole: (role) => userData.role === role,
+      hasAnyRole: (roles) => roles.includes(userData.role),
+    };
+  };
+
   // Check if user is logged in on app start
   useEffect(() => {
     checkAuthStatus();
@@ -29,8 +48,9 @@ export const AuthProvider = ({ children }) => {
       if (token && storedUser) {
         try {
           const userData = await authAPI.getCurrentUser();
-          setUser(userData);
-          localStorage.setItem('user', JSON.stringify(userData));
+          const enhancedUser = enhanceUserWithRoleProperties(userData);
+          setUser(enhancedUser);
+          localStorage.setItem('user', JSON.stringify(enhancedUser));
         } catch (error) {
           console.log('Token invalid, logging out:', error);
           logout();
@@ -50,8 +70,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('refresh_token', response.refresh);
       
       if (response.user) {
-        setUser(response.user);
-        localStorage.setItem('user', JSON.stringify(response.user));
+        const enhancedUser = enhanceUserWithRoleProperties(response.user);
+        setUser(enhancedUser);
+        localStorage.setItem('user', JSON.stringify(enhancedUser));
       } else {
         console.error('No user data in auth response');
         throw new Error('Authentication failed: No user data received');
@@ -195,11 +216,11 @@ export const AuthProvider = ({ children }) => {
   const clearError = () => setError('');
 
   const updateUser = (updatedUserData) => {
-    setUser(updatedUserData);
-    localStorage.setItem('user', JSON.stringify(updatedUserData));
+    const enhancedUser = enhanceUserWithRoleProperties(updatedUserData);
+    setUser(enhancedUser);
+    localStorage.setItem('user', JSON.stringify(enhancedUser));
   };
 
-  // FIXED: Add the missing value object
   const value = {
     user,
     loading,
@@ -218,11 +239,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={value}> {/* FIXED: Now has value prop */}
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Export the context for direct access if needed
 export default AuthContext;

@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
+import { useNotification } from "../../../context/NotificationContext";
 import { useReports } from "../../../hooks/useReports";
 import LocationSection from "./LocationSection";
 import DetailsSection from "./DetailsSection";
 import MediaSection from "./MediaSection";
 import AIFeedback from "./AIFeedback";
 import locationService from "../../../services/api/locationService";
-const CreateReportForm = () => {
+
+const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { createReport, analyzeReport, loading, error, clearError } =
-    useReports();
+  const { showSuccess, showError, showInfo, showWarning } = useNotification();
+  const { createReport, analyzeReport, loading, error, clearError } = useReports();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -137,7 +138,6 @@ const CreateReportForm = () => {
     }
   };
 
-  // In the handleAnalysisUpdate function, update this part:
   const handleAnalysisUpdate = useCallback(
     async (title, description) => {
       if (!title || !description) return;
@@ -149,19 +149,23 @@ const CreateReportForm = () => {
 
           // Auto-fill department if high confidence
           if (analysis.confidence >= 0.8 && analysis.predicted_department) {
-            const matchedDept = departmentsArray.find(
+            const matchedDept = departments.find(
               (dept) => dept.name === analysis.predicted_department
             );
             if (matchedDept) {
               setFormData((prev) => ({ ...prev, department: matchedDept.id }));
+              showInfo(`AI suggested department: ${analysis.predicted_department}`, 'AI Suggestion');
             }
           }
         }
+        return analysis;
       } catch (error) {
         console.error("AI analysis failed:", error);
+        showWarning('AI analysis is temporarily unavailable. Please select department manually.', 'AI Service');
+        return null;
       }
     },
-    [analyzeReport, departments]
+    [analyzeReport, departments, showInfo, showWarning]
   );
 
   // Form validation
@@ -219,6 +223,7 @@ const CreateReportForm = () => {
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "center" });
       }
+      showError('Please fix the validation errors before submitting.', 'Validation Error');
       return;
     }
 
@@ -237,31 +242,32 @@ const CreateReportForm = () => {
     };
 
     try {
+      onSubmissionStart();
       const result = await createReport(submitData);
 
       if (result.success) {
         resetForm();
-        alert(
-          "Report submitted successfully! You will be redirected to your reports."
-        );
-        navigate("/my-reports");
+        onSubmissionComplete(true, result.reportId);
+      } else {
+        onSubmissionComplete(false, null, error || "Failed to submit report");
       }
     } catch (submitError) {
       console.error("Submission failed:", submitError);
-      // Error is handled by useReports hook
+      onSubmissionComplete(false, null, submitError.message || "Submission failed");
     }
   };
 
   // Handle form cancellation
   const handleCancel = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to cancel? Any unsaved changes will be lost."
-      )
-    ) {
-      resetForm();
-      navigate("/dashboard");
-    }
+    showWarning(
+      "Are you sure you want to cancel? Any unsaved changes will be lost.",
+      "Confirm Cancellation",
+      10000,
+      () => {
+        resetForm();
+        navigate("/dashboard");
+      }
+    );
   };
 
   // Authentication check
@@ -396,9 +402,9 @@ const CreateReportForm = () => {
             setFormData={setFormData}
             counties={counties}
             subCounties={subCounties}
-            setSubCounties={setSubCounties} // Add this
+            setSubCounties={setSubCounties}
             wards={wards}
-            setWards={setWards} // Add this
+            setWards={setWards}
             loadingCounties={loadingCounties}
             loadingSubCounties={loadingSubCounties}
             loadingWards={loadingWards}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNotification } from '../../../context/NotificationContext';
 import useLocation from '../../../hooks/useLocation';
 import locationService from '../../../services/api/locationService';
 
@@ -13,6 +14,7 @@ const LocationSection = ({
   loadingWards,
   validationErrors
 }) => {
+  const { showSuccess, showError, showInfo } = useNotification();
   const { 
     detectedArea, 
     loading: locationLoading, 
@@ -43,9 +45,15 @@ const LocationSection = ({
           
           // Show success message based on confidence level
           if (locationInfo.confidence === 'high') {
-            alert(`Location detected successfully! Your area: ${locationInfo.ward.name}, ${locationInfo.subcounty.name}, ${locationInfo.county.name}`);
+            showSuccess(
+              `Location detected successfully! Your area: ${locationInfo.ward.name}, ${locationInfo.subcounty.name}, ${locationInfo.county.name}`,
+              'Location Detected'
+            );
           } else {
-            alert(`Location detected! Please confirm your administrative area: ${locationInfo.county.name}`);
+            showInfo(
+              `Location detected! Please confirm your administrative area: ${locationInfo.county.name}`,
+              'Location Detected'
+            );
           }
         }
         
@@ -58,7 +66,10 @@ const LocationSection = ({
           longitude: areaData.longitude.toString()
         }));
         
-        alert('Location detected! Please select your county, sub-county, and ward from the dropdowns.');
+        showInfo(
+          'Location detected! Please select your county, sub-county, and ward from the dropdowns.',
+          'Location Detected'
+        );
       }
     }
   };

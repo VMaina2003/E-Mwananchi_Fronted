@@ -1,6 +1,7 @@
 // src/pages/reports/CreateReport.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotification } from '../../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import CreateReportForm from '../../components/reports/CreateReportForm/index';
@@ -14,9 +15,11 @@ import CreateReportForm from '../../components/reports/CreateReportForm/index';
  * - Professional styling and UX
  * - Mobile-responsive design
  * - Accessibility compliance
+ * - Modern notification system
  */
 const CreateReport = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const { showSuccess, showError, showInfo, showWarning } = useNotification();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,6 +28,7 @@ const CreateReport = () => {
     if (isLoading) return; // Wait for auth check to complete
 
     if (!isAuthenticated || !user) {
+      showInfo('Please log in to create a report', 'Authentication Required');
       navigate('/login', { 
         replace: true,
         state: { from: '/reports/create' }
@@ -34,26 +38,39 @@ const CreateReport = () => {
 
     const allowedRoles = ['citizen', 'county_official', 'admin', 'superadmin'];
     if (!allowedRoles.includes(user.role)) {
+      showError('You do not have permission to create reports', 'Access Denied');
       navigate('/dashboard', { replace: true });
       return;
     }
-  }, [isAuthenticated, user, isLoading, navigate]);
+  }, [isAuthenticated, user, isLoading, navigate, showInfo, showError]);
 
   // Submission state handlers
   const handleSubmissionStart = () => {
     setIsSubmitting(true);
+    showInfo('Processing your report...', 'Submitting Report');
   };
 
-  const handleSubmissionComplete = (success, reportId = null) => {
+  const handleSubmissionComplete = (success, reportId = null, errorMessage = null) => {
     setIsSubmitting(false);
+    
     if (success && reportId) {
+      showSuccess(
+        'Your report has been successfully submitted and is being processed',
+        'Report Created Successfully'
+      );
+      
       // Redirect to report detail page on success
       setTimeout(() => {
         navigate(`/reports/${reportId}`, { 
           replace: true,
           state: { created: true }
         });
-      }, 1500);
+      }, 2000);
+    } else if (errorMessage) {
+      showError(
+        errorMessage || 'Failed to submit report. Please try again.',
+        'Submission Failed'
+      );
     }
   };
 

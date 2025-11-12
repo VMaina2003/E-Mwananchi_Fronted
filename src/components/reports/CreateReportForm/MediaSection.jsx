@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
+import { useNotification } from '../../../context/NotificationContext';
 
 const MediaSection = ({ formData, setFormData, validationErrors }) => {
+  const { showError, showInfo } = useNotification();
   const fileInputRef = useRef(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [stream, setStream] = useState(null);
@@ -13,10 +15,17 @@ const MediaSection = ({ formData, setFormData, validationErrors }) => {
     const imageFiles = files.filter(file => file.type.startsWith('image/'));
     
     if (imageFiles.length > 0) {
+      if (formData.images.length + imageFiles.length > 10) {
+        showError('Maximum 10 photos allowed per report', 'Photo Limit');
+        return;
+      }
+      
       setFormData(prev => ({
         ...prev,
         images: [...prev.images, ...imageFiles]
       }));
+      
+      showInfo(`Added ${imageFiles.length} photo(s)`, 'Photos Added');
     }
   };
 
@@ -40,7 +49,10 @@ const MediaSection = ({ formData, setFormData, validationErrors }) => {
       }
     } catch (error) {
       console.error('Camera access failed:', error);
-      alert(`Camera access denied: ${error.message}. Please allow camera permissions or use gallery upload.`);
+      showError(
+        `Camera access denied: ${error.message}. Please allow camera permissions or use gallery upload.`,
+        'Camera Error'
+      );
     }
   };
 
@@ -74,10 +86,17 @@ const MediaSection = ({ formData, setFormData, validationErrors }) => {
             type: 'image/jpeg'
           });
           
+          if (formData.images.length >= 10) {
+            showError('Maximum 10 photos allowed per report', 'Photo Limit');
+            return;
+          }
+          
           setFormData(prev => ({
             ...prev,
             images: [...prev.images, file]
           }));
+          
+          showInfo('Photo captured successfully!', 'Photo Captured');
         }
       }, 'image/jpeg', 0.8);
       
@@ -92,6 +111,7 @@ const MediaSection = ({ formData, setFormData, validationErrors }) => {
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
     }));
+    showInfo('Photo removed', 'Photo Removed');
   };
 
   // Trigger file input
@@ -185,7 +205,7 @@ const MediaSection = ({ formData, setFormData, validationErrors }) => {
       {formData.images.length > 0 && (
         <div className="mt-6">
           <h3 className="text-lg font-medium text-gray-900 mb-3">
-            Selected Photos ({formData.images.length})
+            Selected Photos ({formData.images.length}/10)
           </h3>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -199,7 +219,7 @@ const MediaSection = ({ formData, setFormData, validationErrors }) => {
                 <button
                   type="button"
                   onClick={() => removeImage(index)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                 >
                   ×
                 </button>
