@@ -32,8 +32,8 @@ const BrowseReports = lazy(() => import("./pages/reports/BrowseReports"));
 // Support and Legal Pages
 const HelpCenter = lazy(() => import("./pages/support/HelpCenter"));
 const ContactUs = lazy(() => import("./pages/support/ContactUs"));
-const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
-const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("./pages/support/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/support/TermsOfService"));
 
 // Route Configuration - Centralized for easy maintenance
 const ROUTES = {
