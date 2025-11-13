@@ -1,4 +1,4 @@
-// src/App.jsx - FIXED ROUTE STRUCTURE
+// src/App.jsx - UPDATED ROUTE STRUCTURE WITH SUPPORT PAGES
 import React, { Suspense, lazy } from "react";
 import {
   BrowserRouter as Router,
@@ -29,6 +29,12 @@ const MainDashboard = lazy(() => import("./pages/dashboard/MainDashboard"));
 const ReportsList = lazy(() => import("./pages/reports/ReportsList"));
 const BrowseReports = lazy(() => import("./pages/reports/BrowseReports"));
 
+// Support and Legal Pages
+const HelpCenter = lazy(() => import("./pages/support/HelpCenter"));
+const ContactUs = lazy(() => import("./pages/support/ContactUs"));
+const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
+
 // Route Configuration - Centralized for easy maintenance
 const ROUTES = {
   PUBLIC: {
@@ -42,6 +48,10 @@ const ROUTES = {
     APPLE_CALLBACK: "/auth/apple/callback",
     GOOGLE_CALLBACK: "/auth/google/callback",
     REPORT_DETAIL: "/reports/:id",
+    HELP: "/help",
+    CONTACT: "/contact",
+    PRIVACY: "/privacy",
+    TERMS: "/terms",
   },
   PROTECTED: {
     DASHBOARD: "/dashboard",
@@ -325,7 +335,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Main App Component with INLINE ROUTES (Fixed version)
+// Main App Component with COMPLETE ROUTES
 function App() {
   return (
     <ErrorBoundary>
@@ -415,6 +425,40 @@ function App() {
                     element={
                       <MixedRoute>
                         <ReportDetail />
+                      </MixedRoute>
+                    }
+                  />
+
+                  {/* Support & Legal Routes - Accessible to all */}
+                  <Route
+                    path={ROUTES.PUBLIC.HELP}
+                    element={
+                      <MixedRoute>
+                        <HelpCenter />
+                      </MixedRoute>
+                    }
+                  />
+                  <Route
+                    path={ROUTES.PUBLIC.CONTACT}
+                    element={
+                      <MixedRoute>
+                        <ContactUs />
+                      </MixedRoute>
+                    }
+                  />
+                  <Route
+                    path={ROUTES.PUBLIC.PRIVACY}
+                    element={
+                      <MixedRoute>
+                        <PrivacyPolicy />
+                      </MixedRoute>
+                    }
+                  />
+                  <Route
+                    path={ROUTES.PUBLIC.TERMS}
+                    element={
+                      <MixedRoute>
+                        <TermsOfService />
                       </MixedRoute>
                     }
                   />
