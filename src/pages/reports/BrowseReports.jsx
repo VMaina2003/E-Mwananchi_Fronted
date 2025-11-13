@@ -1,4 +1,4 @@
-// src/pages/reports/BrowseReports.jsx - COMPLETELY FIXED
+// src/pages/reports/BrowseReports.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -9,13 +9,17 @@ import reportService from "../../services/api/reportService";
 import locationService from "../../services/api/locationService";
 import commentService from "../../services/api/commentService";
 
-// Lazy load CommentSection
-const CommentSection = React.lazy(() => import("../../components/comments/CommentSection"));
-
+/**
+ * BrowseReports Component
+ * Main page for browsing and filtering community reports
+ * Features: Like/comment functionality, filtering, statistics display
+ */
 const BrowseReports = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { showSuccess, showError, showInfo } = useNotification();
+  
+  // State declarations
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showComments, setShowComments] = useState({});
@@ -34,17 +38,22 @@ const BrowseReports = () => {
   });
   const [likingReports, setLikingReports] = useState(new Set());
 
+  // Load data on component mount and filter changes
   useEffect(() => {
     loadAllReports();
     loadLocationData();
     loadStats();
   }, [filters]);
 
+  /**
+   * Load all reports with current filters
+   */
   const loadAllReports = async () => {
     try {
       setLoading(true);
       const reportsData = await reportService.getReports(filters);
       
+      // Handle different response formats from API
       let reportsArray = [];
       if (Array.isArray(reportsData)) {
         reportsArray = reportsData;
@@ -64,6 +73,9 @@ const BrowseReports = () => {
     }
   };
 
+  /**
+   * Load statistics for dashboard cards
+   */
   const loadStats = async () => {
     try {
       const statsData = await reportService.getStats();
@@ -73,6 +85,9 @@ const BrowseReports = () => {
     }
   };
 
+  /**
+   * Load location data for filters (counties and departments)
+   */
   const loadLocationData = async () => {
     try {
       const [countiesData, departmentsData] = await Promise.all([
@@ -86,6 +101,11 @@ const BrowseReports = () => {
     }
   };
 
+  /**
+   * Handle like/unlike with optimistic updates
+   * @param {string} reportId - ID of report to like/unlike
+   * @param {Event} e - Click event
+   */
   const handleLikeOptimistic = async (reportId, e) => {
     e.stopPropagation();
     
@@ -105,18 +125,18 @@ const BrowseReports = () => {
     // Store original state for rollback
     const originalReports = [...reports];
     
-    // Optimistic update
+    // Optimistic update - immediately update UI
     const updatedReports = reports.map(r => {
       if (r.id === reportId) {
         if (userLiked) {
-          // Unlike
+          // Unlike - decrement count
           return {
             ...r,
             likes_count: Math.max(0, currentLikes - 1),
             current_user_liked: false
           };
         } else {
-          // Like
+          // Like - increment count
           return {
             ...r,
             likes_count: currentLikes + 1,
@@ -132,6 +152,7 @@ const BrowseReports = () => {
     try {
       setLikingReports(prev => new Set(prev).add(reportId));
       
+      // Make actual API call
       if (userLiked) {
         await reportService.unlikeReport(reportId);
         showInfo("Report unliked");
@@ -147,6 +168,7 @@ const BrowseReports = () => {
       // Revert optimistic update on error
       setReports(originalReports);
     } finally {
+      // Remove from loading set
       setLikingReports(prev => {
         const newSet = new Set(prev);
         newSet.delete(reportId);
@@ -155,6 +177,11 @@ const BrowseReports = () => {
     }
   };
 
+  /**
+   * Add comment to a report
+   * @param {string} reportId - Report ID to comment on
+   * @param {string} commentText - Comment content
+   */
   const handleAddComment = async (reportId, commentText) => {
     try {
       const commentData = {
@@ -178,6 +205,11 @@ const BrowseReports = () => {
     }
   };
 
+  /**
+   * Toggle comments section for a report
+   * @param {string} reportId - Report ID to toggle comments
+   * @param {Event} e - Click event
+   */
   const handleCommentClick = (reportId, e) => {
     if (e) e.stopPropagation();
     setShowComments(prev => ({
@@ -186,6 +218,11 @@ const BrowseReports = () => {
     }));
   };
 
+  /**
+   * Update filter values
+   * @param {string} key - Filter key (county, department, status, search)
+   * @param {string} value - Filter value
+   */
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
       ...prev,
@@ -193,6 +230,9 @@ const BrowseReports = () => {
     }));
   };
 
+  /**
+   * Reset all filters to default values
+   */
   const clearFilters = () => {
     setFilters({
       county: "",
@@ -202,6 +242,11 @@ const BrowseReports = () => {
     });
   };
 
+  /**
+   * Check if current user has liked a report
+   * @param {Object} report - Report object to check
+   * @returns {boolean} - True if user liked the report
+   */
   const isUserLiked = (report) => {
     if (!report || !user) return false;
     
@@ -218,6 +263,11 @@ const BrowseReports = () => {
     return false;
   };
 
+  /**
+   * Get CSS classes for status badges
+   * @param {string} status - Report status
+   * @returns {string} - Tailwind CSS classes
+   */
   const getStatusColor = (status) => {
     switch (status) {
       case 'resolved': return 'bg-green-100 text-green-800 border border-green-200';
@@ -229,6 +279,11 @@ const BrowseReports = () => {
     }
   };
 
+  /**
+   * Format date string to readable format
+   * @param {string} dateString - ISO date string
+   * @returns {string} - Formatted date
+   */
   const formatDate = (dateString) => {
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
@@ -240,6 +295,9 @@ const BrowseReports = () => {
       return dateString;
     }
   };
+
+  // ... rest of the JSX remains the same ...
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex flex-col">
@@ -556,10 +614,10 @@ const BrowseReports = () => {
                           </div>
                         </div>
                         
-                        {/* Comments Section - FIXED OVERLAY */}
+                        {/* Comments Section */}
                         {showComments[report.id] && (
                           <div 
-                            className="border-t border-gray-100 bg-white p-6"
+                            className="border-t border-gray-100 bg-gray-50 p-6"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <React.Suspense fallback={<div className="text-center py-4">Loading comments...</div>}>

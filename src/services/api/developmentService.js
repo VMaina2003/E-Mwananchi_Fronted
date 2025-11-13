@@ -11,7 +11,12 @@ class DevelopmentService {
       return response.data;
     } catch (error) {
       console.error('Error fetching government projects:', error.response?.data || error.message);
-      throw error;
+      
+      // Return empty results instead of throwing error
+      return {
+        results: [],
+        count: 0
+      };
     }
   }
 
@@ -59,10 +64,49 @@ class DevelopmentService {
    */
   async updateProjectProgress(id, progressData) {
     try {
-      const response = await api.post(`/government-developments/${id}/update-progress/`, progressData);
+      const response = await api.post(`/government-developments/${id}/update_progress/`, progressData);
       return response.data;
     } catch (error) {
       console.error(`Error updating project progress ${id}:`, error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Like a government project
+   */
+  async likeProject(id) {
+    try {
+      const response = await api.post(`/government-developments/${id}/like/`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error liking project ${id}:`, error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Unlike a government project
+   */
+  async unlikeProject(id) {
+    try {
+      const response = await api.post(`/government-developments/${id}/unlike/`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error unliking project ${id}:`, error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get development statistics
+   */
+  async getDevelopmentStats() {
+    try {
+      const response = await api.get('/government-developments/stats/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching development stats:', error.response?.data || error.message);
       throw error;
     }
   }

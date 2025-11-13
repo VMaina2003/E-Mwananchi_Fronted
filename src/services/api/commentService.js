@@ -1,9 +1,15 @@
 // src/services/api/commentService.js
 import api from './api';
 
+/**
+ * CommentService - API service for comment operations
+ * Handles CRUD operations for comments and comment-related functionality
+ */
 class CommentService {
   /**
-   * Get all comments with filtering
+   * Get all comments with optional filtering
+   * @param {Object} params - Filter parameters (report, comment_type, etc.)
+   * @returns {Promise<Array>} - Array of comments
    */
   async getComments(params = {}) {
     try {
@@ -17,6 +23,8 @@ class CommentService {
 
   /**
    * Get comments for a specific report
+   * @param {string} reportId - ID of the report
+   * @returns {Promise<Array>} - Array of comments for the report
    */
   async getCommentsByReport(reportId) {
     try {
@@ -32,6 +40,8 @@ class CommentService {
 
   /**
    * Get a single comment by ID
+   * @param {string} commentId - ID of the comment
+   * @returns {Promise<Object>} - Comment object
    */
   async getComment(commentId) {
     try {
@@ -45,6 +55,8 @@ class CommentService {
 
   /**
    * Create a new comment
+   * @param {Object} commentData - Comment data (report, user, content, comment_type)
+   * @returns {Promise<Object>} - Created comment object
    */
   async createComment(commentData) {
     try {

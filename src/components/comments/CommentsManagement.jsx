@@ -1,14 +1,25 @@
+
+// src/components/admin/CommentsManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import commentService from '../../services/api/commentService'; // adjust path
-import { showSuccess, showError } from '../../utils/alerts'; // adjust path
-import { STATUS_CONFIG } from '../../constants/statusConfig'; // adjust path
+import commentService from '../../services/api/commentService';
+import { showSuccess, showError } from '../../utils/alerts';
+import { STATUS_CONFIG } from '../../constants/statusConfig';
 
+/**
+ * CommentsManagement Component
+ * Admin interface for managing and moderating user comments
+ * Features: Search, delete, view comment details
+ */
 const CommentsManagement = ({ comments = [], loadAdminData }) => {
   const navigate = useNavigate();
   const [selectedComment, setSelectedComment] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  /**
+   * Delete a comment after confirmation
+   * @param {string} commentId - ID of comment to delete
+   */
   const handleDeleteComment = async (commentId) => {
     if (window.confirm('Are you sure you want to delete this comment? This action cannot be undone.')) {
       try {
@@ -16,18 +27,23 @@ const CommentsManagement = ({ comments = [], loadAdminData }) => {
         showSuccess('Comment deleted successfully', 'Comment Management');
         loadAdminData(); // reload data after deletion
       } catch (error) {
-        console.error(error);
+        console.error('Delete comment error:', error);
         showError('Failed to delete comment', 'Deletion Error');
       }
     }
   };
 
+  /**
+   * Navigate to the report associated with a comment
+   * @param {Object} comment - Comment object with report data
+   */
   const handleViewReport = (comment) => {
     if (comment.report) {
       navigate(`/reports/${comment.report.id}`);
     }
   };
 
+  // Filter comments based on search term
   const filteredComments = comments.filter(comment =>
     comment.content?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     comment.user?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
