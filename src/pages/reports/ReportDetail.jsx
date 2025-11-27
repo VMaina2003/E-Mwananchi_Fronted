@@ -1,4 +1,4 @@
-// src/pages/reports/ReportDetail.jsx - COMPLETE REWRITTEN VERSION
+// src/pages/reports/ReportDetail.jsx - FIXED VERSION
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -61,22 +61,7 @@ const ReportDetail = () => {
       setSelectedStatus(data.status);
     } catch (err) {
       console.error("Failed to fetch report:", err);
-
-      if (err.response?.status === 404) {
-        showError("Report not found", "Report Error");
-      } else if (err.response?.status === 401) {
-        showError(
-          "Please log in to view report details",
-          "Authentication Required"
-        );
-      } else if (err.response?.status === 403) {
-        showError(
-          "You do not have permission to view this report",
-          "Access Denied"
-        );
-      } else {
-        showError("Failed to load report. Please try again.", "Loading Error");
-      }
+      showError("Failed to load report. Please try again.", "Loading Error");
     } finally {
       setLoading(false);
     }
@@ -87,18 +72,13 @@ const ReportDetail = () => {
       setLoadingComments(true);
       const response = await commentService.getCommentsByReport(id);
 
-      // Handle different API response structures
       let commentsData = [];
-
       if (Array.isArray(response)) {
         commentsData = response;
       } else if (response && Array.isArray(response.results)) {
         commentsData = response.results;
       } else if (response && Array.isArray(response.data)) {
         commentsData = response.data;
-      } else {
-        console.warn("Unexpected comments response structure:", response);
-        commentsData = [];
       }
 
       setComments(commentsData);
@@ -125,7 +105,7 @@ const ReportDetail = () => {
   };
 
   const handleStatusUpdate = async () => {
-    if (!selectedStatus || selectedStatus === report.status || !user) return;
+    if (!selectedStatus || selectedStatus === report?.status || !user) return;
 
     try {
       setUpdatingStatus(true);
@@ -192,42 +172,7 @@ const ReportDetail = () => {
       }
     } catch (error) {
       console.error("Failed to submit comment:", error);
-
-      if (error.response?.status === 401) {
-        showError(
-          "Session expired. Please log in again.",
-          "Authentication Error"
-        );
-        navigate("/login", { state: { from: `/reports/${id}` } });
-      } else if (error.response?.status === 400) {
-        const errorData = error.response.data;
-        if (typeof errorData === "object") {
-          const errorMessages = Object.values(errorData).flat().join(", ");
-          showError(`Validation error: ${errorMessages}`, "Validation Error");
-        } else {
-          showError(
-            "Invalid comment data. Please check your input.",
-            "Validation Error"
-          );
-        }
-      } else if (error.response?.status === 403) {
-        showError(
-          "You do not have permission to post this type of comment.",
-          "Permission Error"
-        );
-      } else if (error.response?.status === 429) {
-        showError(
-          "Too many comments. Please wait before posting again.",
-          "Rate Limit"
-        );
-      } else if (error.response?.status === 500) {
-        showError("Server error. Please try again later.", "Server Error");
-      } else {
-        showError(
-          "Failed to submit comment. Please try again.",
-          "Comment Error"
-        );
-      }
+      showError("Failed to submit comment. Please try again.", "Comment Error");
     } finally {
       setSubmittingComment(false);
     }
@@ -239,8 +184,8 @@ const ReportDetail = () => {
       isOpen: true,
       commentId: comment.id,
       commentContent:
-        comment.content.substring(0, 100) +
-        (comment.content.length > 100 ? "..." : ""),
+        comment.content?.substring(0, 100) +
+        (comment.content?.length > 100 ? "..." : ""),
     });
   };
 
@@ -253,15 +198,7 @@ const ReportDetail = () => {
       showSuccess("Comment deleted successfully", "Comment Deleted");
     } catch (error) {
       console.error("Failed to delete comment:", error);
-
-      if (error.response?.status === 403) {
-        showError(
-          "You don't have permission to delete this comment",
-          "Permission Denied"
-        );
-      } else {
-        showError("Failed to delete comment", "Delete Error");
-      }
+      showError("Failed to delete comment", "Delete Error");
     } finally {
       setDeleteModal({ isOpen: false, commentId: null, commentContent: "" });
     }
@@ -300,7 +237,7 @@ const ReportDetail = () => {
   };
 
   const handleNextImage = () => {
-    if (!report.images) return;
+    if (!report?.images) return;
     const nextIndex = (imageModal.index + 1) % report.images.length;
     setImageModal((prev) => ({
       ...prev,
@@ -310,7 +247,7 @@ const ReportDetail = () => {
   };
 
   const handlePrevImage = () => {
-    if (!report.images) return;
+    if (!report?.images) return;
     const prevIndex =
       (imageModal.index - 1 + report.images.length) % report.images.length;
     setImageModal((prev) => ({
@@ -323,46 +260,18 @@ const ReportDetail = () => {
   // Enhanced permission checking functions
   const canDeleteComment = (comment) => {
     if (!user || !comment) return false;
-
-    // Check if current user is the comment author
     const isAuthor = user.id === comment.user?.id || user.id === comment.user;
-
-    // Check user roles for admin permissions
     const hasAdminPermission =
       user.role === "admin" ||
       user.role === "superadmin" ||
       user.role === "county_official";
-
     return isAuthor || hasAdminPermission;
   };
 
   const canEditComment = (comment) => {
     if (!user || !comment) return false;
-
-    // Check if current user is the comment author
     const isAuthor = user.id === comment.user?.id || user.id === comment.user;
-
-    if (!isAuthor) return false;
-
-    // Use the can_edit property from API if available
-    if (comment.can_edit !== undefined) {
-      return comment.can_edit;
-    }
-
-    // Fallback: Check if comment was created within last 15 minutes
-    if (comment.created_at) {
-      try {
-        const commentTime = new Date(comment.created_at);
-        const currentTime = new Date();
-        const timeDiff = (currentTime - commentTime) / (1000 * 60); // difference in minutes
-        return timeDiff <= 15; // 15 minutes editing window
-      } catch (error) {
-        console.warn("Error calculating edit window:", error);
-        return false;
-      }
-    }
-
-    return false; // Default to false for safety
+    return isAuthor;
   };
 
   const canUpdateStatus =
@@ -370,6 +279,7 @@ const ReportDetail = () => {
     (user.role === "county_official" ||
       user.role === "admin" ||
       user.role === "superadmin");
+
   // Helper functions
   const getStatusColor = (status) => {
     const colors = {
@@ -479,7 +389,7 @@ const ReportDetail = () => {
     return image.image_url || image.image || "/placeholder-image.jpg";
   };
 
-  // Render functions
+  // Render functions - FIXED: Added proper key props
   const renderComments = (commentsToRender) => {
     const safeComments = Array.isArray(commentsToRender)
       ? commentsToRender
@@ -508,9 +418,9 @@ const ReportDetail = () => {
 
     return (
       <div className="space-y-4">
-        {safeComments.map((comment) => (
+        {safeComments.map((comment, index) => (
           <div
-            key={comment.id}
+            key={comment.id || `comment-${index}-${Date.now()}`}
             className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors duration-200"
           >
             <div className="flex justify-between items-start mb-3">
@@ -766,7 +676,7 @@ const ReportDetail = () => {
                 </div>
               </div>
 
-              {/* Images Gallery */}
+              {/* Images Gallery - FIXED: Added proper key */}
               {report.images && report.images.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -787,7 +697,7 @@ const ReportDetail = () => {
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {report.images.map((image, index) => (
-                      <div key={image.id} className="relative group">
+                      <div key={image.id || `image-${index}`} className="relative group">
                         <div className="aspect-square overflow-hidden rounded-lg border border-gray-200 cursor-pointer transform transition-transform duration-200 hover:scale-105">
                           <img
                             src={getImageUrl(image)}
@@ -908,23 +818,6 @@ const ReportDetail = () => {
                           )}
                         </button>
                       </div>
-                      {user.role !== "citizen" && (
-                        <p className="text-xs text-blue-600 mt-3 flex items-center gap-1">
-                          <svg
-                            className="w-3 h-3"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          Official responses will trigger email notifications to
-                          relevant parties.
-                        </p>
-                      )}
                     </form>
                   </div>
                 )}
@@ -1194,7 +1087,7 @@ const ReportDetail = () => {
                 </div>
               )}
 
-              {/* Report Metadata */}
+              {/* Report Metadata - FIXED: Safe substring access */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <svg
@@ -1216,7 +1109,7 @@ const ReportDetail = () => {
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600">Report ID:</span>
                     <span className="font-mono text-gray-900 text-xs bg-gray-100 px-2 py-1 rounded">
-                      {report.id.substring(0, 8)}...
+                      {report?.id ? `${report.id.substring(0, 8)}...` : 'Loading...'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">

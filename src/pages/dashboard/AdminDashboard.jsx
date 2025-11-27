@@ -220,41 +220,45 @@ const AdminDashboard = () => {
       setActionLoading((prev) => ({ ...prev, [userId]: false }));
     }
   };
-const handleReportAction = async (reportId, action, data = null) => {
-  try {
-    setActionLoading((prev) => ({ ...prev, [reportId]: true }));
+  const handleReportAction = async (reportId, action, data = null) => {
+    try {
+      setActionLoading((prev) => ({ ...prev, [reportId]: true }));
 
-    switch (action) {
-      case "delete":
-        // KEEP THIS - professional confirmation for destructive actions
-        if (
-          window.confirm(
-            "Are you sure you want to delete this report? This will remove it from the system."
-          )
-        ) {
-          await reportService.deleteReport(reportId);
-          // Removed: showSuccess("Report deleted successfully", "Report Management");
-          console.log("ReportService: Report deleted successfully");
-        }
-        break;
-      case "update_status":
-        await reportService.updateReportStatus(reportId, data.status);
-        // Removed: showSuccess(`Report status updated to ${data.status}`, "Status Updated");
-        console.log(`ReportService: Report status updated to ${data.status}`);
-        break;
-      default:
-        console.warn("Unknown report action:", action);
+      switch (action) {
+        case "delete":
+          // KEEP THIS - professional confirmation for destructive actions
+          if (
+            window.confirm(
+              "Are you sure you want to delete this report? This will remove it from the system."
+            )
+          ) {
+            await reportService.deleteReport(reportId);
+            // Removed: showSuccess("Report deleted successfully", "Report Management");
+            console.log("ReportService: Report deleted successfully");
+          }
+          break;
+        case "update_status":
+          await reportService.updateReportStatus(reportId, data.status);
+          // Removed: showSuccess(`Report status updated to ${data.status}`, "Status Updated");
+          console.log(`ReportService: Report status updated to ${data.status}`);
+          break;
+        default:
+          console.warn("Unknown report action:", action);
+      }
+
+      await loadAdminData();
+    } catch (error) {
+      console.error("Report action failed:", error);
+      // Removed: showError alert
+      console.error(
+        `ReportService: Failed to ${action} report: ${
+          error.response?.data?.detail || error.message
+        }`
+      );
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [reportId]: false }));
     }
-
-    await loadAdminData();
-  } catch (error) {
-    console.error("Report action failed:", error);
-    // Removed: showError alert
-    console.error(`ReportService: Failed to ${action} report: ${error.response?.data?.detail || error.message}`);
-  } finally {
-    setActionLoading((prev) => ({ ...prev, [reportId]: false }));
-  }
-};
+  };
 
   const filteredReports = reports.filter((report) => {
     const matchesSearch =
@@ -653,7 +657,6 @@ const handleReportAction = async (reportId, action, data = null) => {
                   <p className="text-gray-600 mb-4 line-clamp-2">
                     {report.description}
                   </p>
-
                   <div className="flex flex-wrap gap-2 mb-4">
                     <div className="flex items-center text-sm text-gray-500">
                       <svg
@@ -669,7 +672,8 @@ const handleReportAction = async (reportId, action, data = null) => {
                           d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
                         />
                       </svg>
-                      {report.county?.name || "Unknown County"}
+                      {/* Use county_name from serializer */}
+                      {report.county_name || "Unknown County"}
                     </div>
                     <div className="flex items-center text-sm text-gray-500">
                       <svg
@@ -685,9 +689,8 @@ const handleReportAction = async (reportId, action, data = null) => {
                           d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
                         />
                       </svg>
-                      {report.department?.department?.name ||
-                        report.department?.name ||
-                        "No Department"}
+                      {/* Use department_name from serializer */}
+                      {report.department_name || "No Department"}
                     </div>
                     {report.verified_by_ai && (
                       <div className="flex items-center text-sm text-green-600">
@@ -723,8 +726,8 @@ const handleReportAction = async (reportId, action, data = null) => {
                         d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                       />
                     </svg>
-                    Reported by {report.reporter?.first_name}{" "}
-                    {report.reporter?.last_name}
+                    {/* Use reporter_name from serializer */}
+                    Reported by {report.reporter_name || "Unknown User"}
                     <span className="mx-2">•</span>
                     <svg
                       className="w-4 h-4 mr-1"

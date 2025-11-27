@@ -1,21 +1,21 @@
 // src/pages/dashboard/OfficialDashboard.jsx - PROFESSIONAL VERSION
-import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { useNotification } from '../../context/NotificationContext';
-import { useNavigate } from 'react-router-dom';
-import Header from '../../components/common/Header';
-import Footer from '../../components/common/Footer';
-import reportService from '../../services/api/reportService';
-import developmentService from '../../services/api/developmentService';
-import locationService from '../../services/api/locationService';
-import departmentService from '../../services/api/departmentService';
+import React, { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { useNotification } from "../../context/NotificationContext";
+import { useNavigate } from "react-router-dom";
+import Header from "../../components/common/Header";
+import Footer from "../../components/common/Footer";
+import reportService from "../../services/api/reportService";
+import developmentService from "../../services/api/developmentService";
+import locationService from "../../services/api/locationService";
+import departmentService from "../../services/api/departmentService";
 
 const OfficialDashboard = () => {
   const { user } = useAuth();
   const { showSuccess, showError } = useNotification();
   const navigate = useNavigate();
-  
-  const [activeTab, setActiveTab] = useState('verified');
+
+  const [activeTab, setActiveTab] = useState("verified");
   const [selectedCounty, setSelectedCounty] = useState(null);
   const [counties, setCounties] = useState([]);
   const [reports, setReports] = useState([]);
@@ -27,79 +27,83 @@ const OfficialDashboard = () => {
     verified: 0,
     noted: 0,
     on_progress: 0,
-    resolved: 0
+    resolved: 0,
   });
 
   // Status configuration matching Django model
   const STATUS_CONFIG = {
-    submitted: { 
-      label: 'Submitted', 
-      color: 'bg-gray-100 text-gray-800 border-gray-200',
-      actions: []
+    submitted: {
+      label: "Submitted",
+      color: "bg-gray-100 text-gray-800 border-gray-200",
+      actions: [],
     },
-    verified: { 
-      label: 'Verified', 
-      color: 'bg-blue-100 text-blue-800 border-blue-200',
-      actions: ['noted', 'on_progress', 'resolved']
+    verified: {
+      label: "Verified",
+      color: "bg-blue-100 text-blue-800 border-blue-200",
+      actions: ["noted", "on_progress", "resolved"],
     },
-    pending: { 
-      label: 'Pending Review', 
-      color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      actions: ['verified', 'noted']
+    pending: {
+      label: "Pending Review",
+      color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      actions: ["verified", "noted"],
     },
-    noted: { 
-      label: 'Noted', 
-      color: 'bg-purple-100 text-purple-800 border-purple-200',
-      actions: ['on_progress', 'resolved']
+    noted: {
+      label: "Noted",
+      color: "bg-purple-100 text-purple-800 border-purple-200",
+      actions: ["on_progress", "resolved"],
     },
-    on_progress: { 
-      label: 'On Progress', 
-      color: 'bg-orange-100 text-orange-800 border-orange-200',
-      actions: ['resolved', 'noted']
+    on_progress: {
+      label: "On Progress",
+      color: "bg-orange-100 text-orange-800 border-orange-200",
+      actions: ["resolved", "noted"],
     },
-    resolved: { 
-      label: 'Resolved', 
-      color: 'bg-green-100 text-green-800 border-green-200',
-      actions: ['on_progress']
+    resolved: {
+      label: "Resolved",
+      color: "bg-green-100 text-green-800 border-green-200",
+      actions: ["on_progress"],
     },
-    rejected: { 
-      label: 'Rejected', 
-      color: 'bg-red-100 text-red-800 border-red-200',
-      actions: ['verified']
-    }
+    rejected: {
+      label: "Rejected",
+      color: "bg-red-100 text-red-800 border-red-200",
+      actions: ["verified"],
+    },
   };
 
   const ACTION_LABELS = {
-    noted: 'Mark as Noted',
-    on_progress: 'Start Work',
-    resolved: 'Mark Resolved',
-    verified: 'Verify Report',
-    rejected: 'Reject Report'
+    noted: "Mark as Noted",
+    on_progress: "Start Work",
+    resolved: "Mark Resolved",
+    verified: "Verify Report",
+    rejected: "Reject Report",
   };
 
   // Permission checks
   const canAccessOfficialDashboard = () => {
     if (!user) return false;
     const userRole = user.role;
-    return userRole === 'county_official' || userRole === 'admin' || userRole === 'superadmin';
+    return (
+      userRole === "county_official" ||
+      userRole === "admin" ||
+      userRole === "superadmin"
+    );
   };
 
   const canManageMultipleCounties = () => {
     if (!user) return false;
     const userRole = user.role;
-    return userRole === 'admin' || userRole === 'superadmin';
+    return userRole === "admin" || userRole === "superadmin";
   };
 
   // Load dashboard data
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       const [countiesData, departmentsData] = await Promise.all([
         locationService.getAllCounties(),
-        departmentService.getDepartments()
+        departmentService.getDepartments(),
       ]);
-      
+
       setCounties(countiesData);
       setDepartments(departmentsData);
 
@@ -107,15 +111,17 @@ const OfficialDashboard = () => {
       if (countiesData.length > 0) {
         let initialCounty = countiesData[0];
         if (user?.county) {
-          const userCounty = countiesData.find(c => c.id === user.county.id);
+          const userCounty = countiesData.find((c) => c.id === user.county.id);
           if (userCounty) initialCounty = userCounty;
         }
         setSelectedCounty(initialCounty);
       }
-      
     } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-      showError('Failed to load dashboard data. Please try again.', 'Loading Error');
+      console.error("Failed to load dashboard data:", error);
+      showError(
+        "Failed to load dashboard data. Please try again.",
+        "Loading Error"
+      );
     } finally {
       setLoading(false);
     }
@@ -126,12 +132,14 @@ const OfficialDashboard = () => {
     try {
       const params = { county: countyId };
       const reportsData = await reportService.getReports(params);
-      const reportsArray = Array.isArray(reportsData) ? reportsData : reportsData.results || [];
+      const reportsArray = Array.isArray(reportsData)
+        ? reportsData
+        : reportsData.results || [];
       setReports(reportsArray);
       calculateStats(reportsArray);
     } catch (error) {
-      console.error('Error loading county reports:', error);
-      showError('Failed to load reports for selected county', 'Data Error');
+      console.error("Error loading county reports:", error);
+      showError("Failed to load reports for selected county", "Data Error");
     }
   };
 
@@ -139,10 +147,11 @@ const OfficialDashboard = () => {
   const calculateStats = (reportsArray) => {
     const stats = {
       total: reportsArray.length,
-      verified: reportsArray.filter(r => r.status === 'verified').length,
-      noted: reportsArray.filter(r => r.status === 'noted').length,
-      on_progress: reportsArray.filter(r => r.status === 'on_progress').length,
-      resolved: reportsArray.filter(r => r.status === 'resolved').length
+      verified: reportsArray.filter((r) => r.status === "verified").length,
+      noted: reportsArray.filter((r) => r.status === "noted").length,
+      on_progress: reportsArray.filter((r) => r.status === "on_progress")
+        .length,
+      resolved: reportsArray.filter((r) => r.status === "resolved").length,
     };
     setStats(stats);
   };
@@ -152,23 +161,29 @@ const OfficialDashboard = () => {
     try {
       setUpdatingStatus(reportId);
       await reportService.updateReportStatus(reportId, newStatus);
-      
+
       const statusMessages = {
-        'noted': 'Report marked as noted',
-        'on_progress': 'Work started on report',
-        'resolved': 'Report marked as resolved',
-        'verified': 'Report verified successfully',
-        'rejected': 'Report rejected'
+        noted: "Report marked as noted",
+        on_progress: "Work started on report",
+        resolved: "Report marked as resolved",
+        verified: "Report verified successfully",
+        rejected: "Report rejected",
       };
-      
-      showSuccess(statusMessages[newStatus] || 'Status updated successfully', 'Report Updated');
-      
+
+      showSuccess(
+        statusMessages[newStatus] || "Status updated successfully",
+        "Report Updated"
+      );
+
       if (selectedCounty) {
         await loadCountyReports(selectedCounty.id);
       }
     } catch (error) {
-      console.error('Failed to update report status:', error);
-      showError('Failed to update report status. Please try again.', 'Update Error');
+      console.error("Failed to update report status:", error);
+      showError(
+        "Failed to update report status. Please try again.",
+        "Update Error"
+      );
     } finally {
       setUpdatingStatus(null);
     }
@@ -182,8 +197,8 @@ const OfficialDashboard = () => {
 
   // Filter reports based on active tab
   const getFilteredReports = () => {
-    if (activeTab === 'all') return reports;
-    return reports.filter(report => report.status === activeTab);
+    if (activeTab === "all") return reports;
+    return reports.filter((report) => report.status === activeTab);
   };
 
   // Get available actions for a report
@@ -211,19 +226,35 @@ const OfficialDashboard = () => {
         <main className="flex-grow flex items-center justify-center">
           <div className="text-center max-w-md mx-auto p-8 bg-white rounded-xl shadow-lg border border-red-100">
             <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              <svg
+                className="w-10 h-10 text-red-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-red-600 mb-2">Access Restricted</h2>
+            <h2 className="text-2xl font-bold text-red-600 mb-2">
+              Access Restricted
+            </h2>
             <p className="text-gray-600 mb-4">
-              This dashboard is only accessible to county officials and administrators.
+              This dashboard is only accessible to county officials and
+              administrators.
             </p>
             <p className="text-sm text-gray-500 mb-6">
-              Your current role: <span className="font-medium">{user?.role || 'Not logged in'}</span>
+              Your current role:{" "}
+              <span className="font-medium">
+                {user?.role || "Not logged in"}
+              </span>
             </p>
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate("/dashboard")}
               className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
             >
               Return to Dashboard
@@ -238,7 +269,7 @@ const OfficialDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Header />
-      
+
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header Section */}
@@ -246,26 +277,41 @@ const OfficialDashboard = () => {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  <svg
+                    className="w-8 h-8 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                    />
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">County Official Dashboard</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    County Official Dashboard
+                  </h1>
                   <p className="text-gray-600 mt-2">
                     Welcome, {user.first_name} {user.last_name}
                     {user.county && ` • Assigned to ${user.county.name} County`}
-                    {!user.county && user.role === 'county_official' && ` • Multi-County Access`}
+                    {!user.county &&
+                      user.role === "county_official" &&
+                      ` • Multi-County Access`}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
-                    Manage reports, track progress, and provide government responses
+                    Manage reports, track progress, and provide government
+                    responses
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex flex-wrap gap-3">
                 <button
-                  onClick={() => navigate('/reports/create')}
+                  onClick={() => navigate("/reports/create")}
                   className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors shadow-sm"
                 >
                   Create Development Report
@@ -281,29 +327,30 @@ const OfficialDashboard = () => {
           </div>
 
           {/* County Selector */}
-          {(canManageMultipleCounties() || !user.county) && counties.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {user.county ? 'Manage County' : 'Select County to Manage'}
-              </h3>
-              <div className="flex flex-wrap gap-3">
-                {counties.map((county) => (
-                  <button
-                    key={county.id}
-                    onClick={() => handleCountyChange(county)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      selectedCounty?.id === county.id
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {county.name} County
-                    {user.county?.id === county.id && ' (Assigned)'}
-                  </button>
-                ))}
+          {(canManageMultipleCounties() || !user.county) &&
+            counties.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  {user.county ? "Manage County" : "Select County to Manage"}
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {counties.map((county) => (
+                    <button
+                      key={county.id}
+                      onClick={() => handleCountyChange(county)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedCounty?.id === county.id
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {county.name} County
+                      {user.county?.id === county.id && " (Assigned)"}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {loading ? (
             <div className="flex justify-center items-center h-64">
@@ -316,12 +363,26 @@ const OfficialDashboard = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Total Reports</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
+                      <p className="text-sm font-medium text-gray-600">
+                        Total Reports
+                      </p>
+                      <p className="text-3xl font-bold text-gray-900 mt-1">
+                        {stats.total}
+                      </p>
                     </div>
                     <div className="p-3 bg-blue-100 rounded-lg">
-                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <svg
+                        className="w-6 h-6 text-blue-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -330,12 +391,26 @@ const OfficialDashboard = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Verified</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-1">{stats.verified}</p>
+                      <p className="text-sm font-medium text-gray-600">
+                        Verified
+                      </p>
+                      <p className="text-3xl font-bold text-gray-900 mt-1">
+                        {stats.verified}
+                      </p>
                     </div>
                     <div className="p-3 bg-blue-100 rounded-lg">
-                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      <svg
+                        className="w-6 h-6 text-blue-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -345,11 +420,23 @@ const OfficialDashboard = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Noted</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-1">{stats.noted}</p>
+                      <p className="text-3xl font-bold text-gray-900 mt-1">
+                        {stats.noted}
+                      </p>
                     </div>
                     <div className="p-3 bg-purple-100 rounded-lg">
-                      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <svg
+                        className="w-6 h-6 text-purple-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -358,12 +445,26 @@ const OfficialDashboard = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">In Progress</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-1">{stats.on_progress}</p>
+                      <p className="text-sm font-medium text-gray-600">
+                        In Progress
+                      </p>
+                      <p className="text-3xl font-bold text-gray-900 mt-1">
+                        {stats.on_progress}
+                      </p>
                     </div>
                     <div className="p-3 bg-orange-100 rounded-lg">
-                      <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      <svg
+                        className="w-6 h-6 text-orange-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 10V3L4 14h7v7l9-11h-7z"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -372,12 +473,26 @@ const OfficialDashboard = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600">Resolved</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-1">{stats.resolved}</p>
+                      <p className="text-sm font-medium text-gray-600">
+                        Resolved
+                      </p>
+                      <p className="text-3xl font-bold text-gray-900 mt-1">
+                        {stats.resolved}
+                      </p>
                     </div>
                     <div className="p-3 bg-green-100 rounded-lg">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <svg
+                        className="w-6 h-6 text-green-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -388,27 +503,41 @@ const OfficialDashboard = () => {
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { key: 'all', label: 'All Reports', count: stats.total },
-                    { key: 'verified', label: 'Verified', count: stats.verified },
-                    { key: 'noted', label: 'Noted', count: stats.noted },
-                    { key: 'on_progress', label: 'In Progress', count: stats.on_progress },
-                    { key: 'resolved', label: 'Resolved', count: stats.resolved }
-                  ].map(tab => (
+                    { key: "all", label: "All Reports", count: stats.total },
+                    {
+                      key: "verified",
+                      label: "Verified",
+                      count: stats.verified,
+                    },
+                    { key: "noted", label: "Noted", count: stats.noted },
+                    {
+                      key: "on_progress",
+                      label: "In Progress",
+                      count: stats.on_progress,
+                    },
+                    {
+                      key: "resolved",
+                      label: "Resolved",
+                      count: stats.resolved,
+                    },
+                  ].map((tab) => (
                     <button
                       key={tab.key}
                       onClick={() => setActiveTab(tab.key)}
                       className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium text-sm transition-colors ${
                         activeTab === tab.key
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
                     >
                       <span>{tab.label}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        activeTab === tab.key
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-300 text-gray-700'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs ${
+                          activeTab === tab.key
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-300 text-gray-700"
+                        }`}
+                      >
                         {tab.count}
                       </span>
                     </button>
@@ -420,25 +549,40 @@ const OfficialDashboard = () => {
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 {getFilteredReports().length > 0 ? (
                   <div className="divide-y divide-gray-200">
-                    {getFilteredReports().map(report => (
-                      <div key={report.id} className="p-6 hover:bg-gray-50 transition-colors">
+                    {getFilteredReports().map((report) => (
+                      <div
+                        key={report.id}
+                        className="p-6 hover:bg-gray-50 transition-colors"
+                      >
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-start justify-between mb-3">
                               <div>
-                                <h3 className="text-xl font-semibold text-gray-900 mb-1">{report.title}</h3>
+                                <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                                  {report.title}
+                                </h3>
                                 <div className="flex flex-wrap gap-2 mb-2">
-                                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_CONFIG[report.status]?.color || 'bg-gray-100 text-gray-800'}`}>
-                                    {STATUS_CONFIG[report.status]?.label || report.status}
+                                  <span
+                                    className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                      STATUS_CONFIG[report.status]?.color ||
+                                      "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {STATUS_CONFIG[report.status]?.label ||
+                                      report.status}
                                   </span>
                                   {report.department && (
                                     <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                                      {report.department.department?.name || report.department.name || 'Department'}
+                                      {report.department.department?.name ||
+                                        report.department.name ||
+                                        "Department"}
                                     </span>
                                   )}
                                   {report.verified_by_ai && (
                                     <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                                      AI Verified ({(report.ai_confidence * 100).toFixed(0)}%)
+                                      AI Verified (
+                                      {(report.ai_confidence * 100).toFixed(0)}
+                                      %)
                                     </span>
                                   )}
                                   {report.is_development_showcase && (
@@ -449,32 +593,70 @@ const OfficialDashboard = () => {
                                 </div>
                               </div>
                             </div>
-                            
-                            <p className="text-gray-700 mb-4 leading-relaxed">{report.description}</p>
-                            
+
+                            <p className="text-gray-700 mb-4 leading-relaxed">
+                              {report.description}
+                            </p>
+
                             {/* Location Information */}
                             <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-4">
                               <div className="flex items-center space-x-1">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                  />
                                 </svg>
                                 <span>
-                                  {[report.ward?.name, report.subcounty?.name, report.county?.name]
-                                    .filter(Boolean)
-                                    .join(', ')}
+                                  {/* Use the serializer fields */}
+                                  {report.county_name || "Unknown County"}
                                 </span>
                               </div>
                               <div className="flex items-center space-x-1">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                  />
                                 </svg>
-                                <span>By {report.reporter?.first_name} {report.reporter?.last_name}</span>
+                                <span>
+                                  {/* Use reporter_name from serializer */}
+                                  By {report.reporter_name || "Unknown User"}
+                                </span>
                               </div>
                               <div className="flex items-center space-x-1">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
                                 </svg>
-                                <span>{new Date(report.created_at).toLocaleDateString('en-KE')}</span>
+                                <span>
+                                  {new Date(
+                                    report.created_at
+                                  ).toLocaleDateString("en-KE")}
+                                </span>
                               </div>
                             </div>
 
@@ -482,18 +664,27 @@ const OfficialDashboard = () => {
                             <div className="flex items-center space-x-6 text-sm text-gray-500">
                               <span>Views: {report.views_count || 0}</span>
                               <span>Likes: {report.likes_count || 0}</span>
-                              <span>Comments: {report.comments_count || 0}</span>
+                              <span>
+                                Comments: {report.comments_count || 0}
+                              </span>
                             </div>
 
                             {/* Government Response */}
                             {report.government_response && (
                               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                <h4 className="font-semibold text-blue-900 mb-2">Government Response</h4>
-                                <p className="text-blue-800 text-sm">{report.government_response}</p>
+                                <h4 className="font-semibold text-blue-900 mb-2">
+                                  Government Response
+                                </h4>
+                                <p className="text-blue-800 text-sm">
+                                  {report.government_response}
+                                </p>
                                 {report.responded_by && (
                                   <p className="text-blue-600 text-xs mt-2">
-                                    By {report.responded_by.first_name} {report.responded_by.last_name} on{' '}
-                                    {new Date(report.response_date).toLocaleDateString('en-KE')}
+                                    By {report.responded_by.first_name}{" "}
+                                    {report.responded_by.last_name} on{" "}
+                                    {new Date(
+                                      report.response_date
+                                    ).toLocaleDateString("en-KE")}
                                   </p>
                                 )}
                               </div>
@@ -502,23 +693,31 @@ const OfficialDashboard = () => {
 
                           {/* Action Buttons */}
                           <div className="flex flex-col space-y-2 min-w-[200px]">
-                            {getAvailableActions(report).map(action => (
+                            {getAvailableActions(report).map((action) => (
                               <button
                                 key={action}
-                                onClick={() => handleStatusUpdate(report.id, action)}
+                                onClick={() =>
+                                  handleStatusUpdate(report.id, action)
+                                }
                                 disabled={updatingStatus === report.id}
                                 className={`px-4 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                                  action === 'resolved' ? 'bg-green-600 hover:bg-green-700' :
-                                  action === 'on_progress' ? 'bg-orange-600 hover:bg-orange-700' :
-                                  action === 'noted' ? 'bg-purple-600 hover:bg-purple-700' :
-                                  action === 'verified' ? 'bg-blue-600 hover:bg-blue-700' :
-                                  'bg-gray-600 hover:bg-gray-700'
+                                  action === "resolved"
+                                    ? "bg-green-600 hover:bg-green-700"
+                                    : action === "on_progress"
+                                    ? "bg-orange-600 hover:bg-orange-700"
+                                    : action === "noted"
+                                    ? "bg-purple-600 hover:bg-purple-700"
+                                    : action === "verified"
+                                    ? "bg-blue-600 hover:bg-blue-700"
+                                    : "bg-gray-600 hover:bg-gray-700"
                                 }`}
                               >
-                                {updatingStatus === report.id ? 'Updating...' : ACTION_LABELS[action]}
+                                {updatingStatus === report.id
+                                  ? "Updating..."
+                                  : ACTION_LABELS[action]}
                               </button>
                             ))}
-                            
+
                             <button
                               onClick={() => navigate(`/reports/${report.id}`)}
                               className="bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 transition-colors"
@@ -529,7 +728,9 @@ const OfficialDashboard = () => {
                             {/* Add Government Response Button */}
                             {!report.government_response && (
                               <button
-                                onClick={() => navigate(`/reports/${report.id}/response`)}
+                                onClick={() =>
+                                  navigate(`/reports/${report.id}#comments`)
+                                }
                                 className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
                               >
                                 Add Response
@@ -542,18 +743,31 @@ const OfficialDashboard = () => {
                   </div>
                 ) : (
                   <div className="p-12 text-center">
-                    <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="w-16 h-16 text-gray-400 mx-auto mb-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-3">No Reports Found</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                      No Reports Found
+                    </h3>
                     <p className="text-gray-600 mb-8 text-lg">
-                      {selectedCounty 
-                        ? `There are currently no ${activeTab === 'all' ? '' : activeTab + ' '}reports in ${selectedCounty.name} County.`
-                        : 'Please select a county to view reports.'
-                      }
+                      {selectedCounty
+                        ? `There are currently no ${
+                            activeTab === "all" ? "" : activeTab + " "
+                          }reports in ${selectedCounty.name} County.`
+                        : "Please select a county to view reports."}
                     </p>
                     <button
-                      onClick={() => setActiveTab('all')}
+                      onClick={() => setActiveTab("all")}
                       className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
                     >
                       View All Reports
@@ -564,10 +778,22 @@ const OfficialDashboard = () => {
             </>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-              <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <svg
+                className="w-16 h-16 text-gray-400 mx-auto mb-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                />
               </svg>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">No County Available</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                No County Available
+              </h3>
               <p className="text-gray-600 mb-8 text-lg">
                 There are no counties available for management at this time.
               </p>
