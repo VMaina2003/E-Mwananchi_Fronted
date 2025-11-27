@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/dashboard/DashboardLayout';
-import ReportFeed from '../../components/dashboard/ReportFeed';
+import ReportFeed from '../../pages/reports/ReportFeed';
 
 /**
  * Professional Reports Listing Page

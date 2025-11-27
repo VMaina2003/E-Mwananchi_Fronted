@@ -1,3 +1,4 @@
+// hooks/useReports.js - FIXED VERSION
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import reportService from '../services/api/reportService';
@@ -12,32 +13,49 @@ export const useReports = () => {
     setError('');
 
     try {
-      // Transform data for backend
-      const submitData = {
-        ...reportData,
-        new_images: reportData.images || [], // Map to new_images
-        images: undefined // Remove old key
-      };
+      console.log("useReports: Sending data to reportService", {
+        imageCount: reportData.images?.length || 0,
+        hasImages: !!reportData.images,
+        imagesType: typeof reportData.images
+      });
 
-      const data = await reportService.createReport(submitData);
-      return { success: true, data };
+      // Send data directly to reportService without transformation
+      // The reportService will handle FormData creation properly
+      const result = await reportService.createReport(reportData);
+      
+      if (result.success) {
+        return { 
+          success: true, 
+          reportId: result.reportId, 
+          data: result.data 
+        };
+      } else {
+        return { 
+          success: false, 
+          error: result.error,
+          details: result.details 
+        };
+      }
     } catch (err) {
+      console.error("useReports: Error creating report:", err);
       const errorMessage = err.response?.data?.detail || 
                           err.response?.data?.message ||
+                          err.message ||
                           'Failed to create report. Please try again.';
       setError(errorMessage);
-      return { success: false, error: errorMessage };
+      return { 
+        success: false, 
+        error: errorMessage 
+      };
     } finally {
       setLoading(false);
     }
   };
 
   // Local AI simulation for UI feedback only
-  // Actual AI classification happens in backend when report is created
   const analyzeReport = async (title, description) => {
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Enhanced keyword matching based on your Department model categories
         const departmentKeywords = {
           'Health': [
             'hospital', 'clinic', 'doctor', 'medical', 'health', 'disease', 'sick',
@@ -91,19 +109,17 @@ export const useReports = () => {
         };
 
         let predictedDepartment = null;
-        let confidence = 0.3; // Base confidence
+        let confidence = 0.3;
         let matchCount = 0;
 
         const text = (title + ' ' + description).toLowerCase();
         
-        // Find the best matching department
         for (const [dept, deptKeywords] of Object.entries(departmentKeywords)) {
           const matches = deptKeywords.filter(keyword => text.includes(keyword.toLowerCase()));
           if (matches.length > 0) {
             const matchConfidence = matches.length / deptKeywords.length;
             const totalMatches = matches.length;
             
-            // Prefer departments with more matches and higher confidence
             if (matchConfidence > confidence || (matchConfidence === confidence && totalMatches > matchCount)) {
               confidence = matchConfidence;
               matchCount = totalMatches;
@@ -112,23 +128,21 @@ export const useReports = () => {
           }
         }
 
-        // Adjust confidence based on match quality
         if (matchCount >= 3) confidence = Math.min(confidence + 0.3, 0.95);
         else if (matchCount >= 2) confidence = Math.min(confidence + 0.2, 0.85);
         else if (matchCount >= 1) confidence = Math.min(confidence + 0.1, 0.75);
 
-        // Ensure confidence is reasonable
         confidence = Math.max(0.3, Math.min(0.95, confidence));
 
         resolve({
-          verified: confidence > 0.6, // Verified if reasonable confidence
+          verified: confidence > 0.6,
           confidence: parseFloat(confidence.toFixed(2)),
           predicted_department: predictedDepartment,
           predicted_county: null,
           match_count: matchCount,
           source: 'local_simulation'
         });
-      }, 800); // Simulate AI processing time
+      }, 800);
     });
   };
 

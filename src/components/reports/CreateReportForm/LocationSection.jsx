@@ -1,4 +1,5 @@
-import React from 'react';
+// src/components/reports/CreateReportForm/LocationSection.jsx
+import React, { useState, useEffect } from 'react';
 import { useNotification } from '../../../context/NotificationContext';
 import useLocation from '../../../hooks/useLocation';
 import locationService from '../../../services/api/locationService';
@@ -6,13 +7,15 @@ import locationService from '../../../services/api/locationService';
 const LocationSection = ({
   formData,
   setFormData,
-  counties,
-  subCounties,
-  wards,
-  loadingCounties,
-  loadingSubCounties,
-  loadingWards,
-  validationErrors
+  counties = [],
+  subCounties = [],
+  wards = [],
+  onCountyChange,
+  onSubCountyChange,
+  loadingCounties = false,
+  loadingSubCounties = false,
+  loadingWards = false,
+  validationErrors = {}
 }) => {
   const { showSuccess, showError, showInfo } = useNotification();
   const { 
@@ -22,12 +25,83 @@ const LocationSection = ({
     getCurrentLocation 
   } = useLocation();
 
+  const [localCounties, setLocalCounties] = useState([]);
+  const [localSubCounties, setLocalSubCounties] = useState([]);
+  const [localWards, setLocalWards] = useState([]);
+  const [isLoadingCounties, setIsLoadingCounties] = useState(false);
+
+  // Load counties only once on component mount
+  useEffect(() => {
+    const loadCounties = async () => {
+      // If parent already provided sufficient counties, use them
+      if (counties && counties.length >= 47) {
+        setLocalCounties(counties);
+        return;
+      }
+
+      // Only load if we haven't already loaded counties and not currently loading
+      if (localCounties.length === 0 && !isLoadingCounties) {
+        setIsLoadingCounties(true);
+        try {
+          const countiesData = await locationService.getAllCounties();
+          setLocalCounties(countiesData);
+        } catch (error) {
+          console.error('Failed to load counties:', error);
+          showError('Failed to load counties. Please try again.', 'Location Data Error');
+        } finally {
+          setIsLoadingCounties(false);
+        }
+      }
+    };
+
+    loadCounties();
+  }, []); // Empty dependency array - run only once on mount
+
+  // Load subcounties when county changes
+  useEffect(() => {
+    const loadSubCounties = async () => {
+      if (!formData.county) {
+        setLocalSubCounties([]);
+        return;
+      }
+
+      try {
+        const subCountiesData = await locationService.getSubcounties(formData.county);
+        setLocalSubCounties(subCountiesData);
+      } catch (error) {
+        console.error(`Failed to load subcounties:`, error);
+        setLocalSubCounties([]);
+      }
+    };
+
+    loadSubCounties();
+  }, [formData.county]);
+
+  // Load wards when subcounty changes
+  useEffect(() => {
+    const loadWards = async () => {
+      if (!formData.subcounty) {
+        setLocalWards([]);
+        return;
+      }
+
+      try {
+        const wardsData = await locationService.getWards(formData.subcounty);
+        setLocalWards(wardsData);
+      } catch (error) {
+        console.error(`Failed to load wards:`, error);
+        setLocalWards([]);
+      }
+    };
+
+    loadWards();
+  }, [formData.subcounty]);
+
   const handleAutoDetectLocation = async () => {
     const areaData = await getCurrentLocation();
     
     if (areaData && areaData.latitude && areaData.longitude) {
       try {
-        // Use the reverse geocoding service to get exact administrative areas
         const locationInfo = await locationService.reverseGeocode(
           areaData.latitude, 
           areaData.longitude
@@ -43,10 +117,9 @@ const LocationSection = ({
             ward: locationInfo.ward?.id || ''
           }));
           
-          // Show success message based on confidence level
           if (locationInfo.confidence === 'high') {
             showSuccess(
-              `Location detected successfully! Your area: ${locationInfo.ward.name}, ${locationInfo.subcounty.name}, ${locationInfo.county.name}`,
+              `Location detected successfully! Your area: ${locationInfo.ward?.name || ''}, ${locationInfo.subcounty?.name || ''}, ${locationInfo.county.name}`,
               'Location Detected'
             );
           } else {
@@ -59,7 +132,6 @@ const LocationSection = ({
         
       } catch (error) {
         console.error('Reverse geocoding failed:', error);
-        // Fallback: just set coordinates and let user select manually
         setFormData(prev => ({
           ...prev,
           latitude: areaData.latitude.toString(),
@@ -76,28 +148,42 @@ const LocationSection = ({
 
   const handleCountyChange = (e) => {
     const countyId = e.target.value;
+    
     setFormData(prev => ({
       ...prev,
       county: countyId,
       subcounty: '',
       ward: ''
     }));
+    
+    if (onCountyChange) {
+      onCountyChange(countyId);
+    }
   };
 
   const handleSubCountyChange = (e) => {
     const subcountyId = e.target.value;
+    
     setFormData(prev => ({
       ...prev,
       subcounty: subcountyId,
       ward: ''
     }));
+    
+    if (onSubCountyChange) {
+      onSubCountyChange(subcountyId);
+    }
   };
+
+  const displayCounties = (counties && counties.length >= 47) ? counties : localCounties;
+  const displaySubCounties = (subCounties && subCounties.length > 0) ? subCounties : localSubCounties;
+  const displayWards = (wards && wards.length > 0) ? wards : localWards;
+  const actualLoadingCounties = loadingCounties || isLoadingCounties;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-4">Location Details</h2>
       
-      {/* Auto Detect Location Button */}
       <div className="mb-6">
         <button
           type="button"
@@ -144,9 +230,7 @@ const LocationSection = ({
         )}
       </div>
 
-      {/* Manual Location Selection */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* County Selection */}
         <div>
           <label htmlFor="county" className="block text-sm font-medium text-gray-700 mb-2">
             County *
@@ -157,10 +241,15 @@ const LocationSection = ({
             value={formData.county}
             onChange={handleCountyChange}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            disabled={loadingCounties}
+            disabled={actualLoadingCounties}
           >
-            <option value="">Select County</option>
-            {counties.map((county) => (
+            <option value="">
+              {actualLoadingCounties 
+                ? 'Loading counties...' 
+                : `Select County (${displayCounties.length} available)`
+              }
+            </option>
+            {displayCounties.map((county) => (
               <option key={county.id} value={county.id}>
                 {county.name}
               </option>
@@ -171,7 +260,6 @@ const LocationSection = ({
           )}
         </div>
 
-        {/* Sub-County Selection */}
         <div>
           <label htmlFor="subcounty" className="block text-sm font-medium text-gray-700 mb-2">
             Sub-County
@@ -184,8 +272,15 @@ const LocationSection = ({
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             disabled={!formData.county || loadingSubCounties}
           >
-            <option value="">{!formData.county ? 'Select County First' : loadingSubCounties ? 'Loading...' : 'Select Sub-County'}</option>
-            {subCounties.map((subCounty) => (
+            <option value="">
+              {!formData.county 
+                ? 'Select County First' 
+                : loadingSubCounties 
+                  ? 'Loading sub-counties...' 
+                  : `Select Sub-County (${displaySubCounties.length} available)`
+              }
+            </option>
+            {displaySubCounties.map((subCounty) => (
               <option key={subCounty.id} value={subCounty.id}>
                 {subCounty.name}
               </option>
@@ -196,7 +291,6 @@ const LocationSection = ({
           )}
         </div>
 
-        {/* Ward Selection */}
         <div>
           <label htmlFor="ward" className="block text-sm font-medium text-gray-700 mb-2">
             Ward
@@ -209,8 +303,15 @@ const LocationSection = ({
             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             disabled={!formData.subcounty || loadingWards}
           >
-            <option value="">{!formData.subcounty ? 'Select Sub-County First' : loadingWards ? 'Loading...' : 'Select Ward'}</option>
-            {wards.map((ward) => (
+            <option value="">
+              {!formData.subcounty 
+                ? 'Select Sub-County First' 
+                : loadingWards 
+                  ? 'Loading wards...' 
+                  : `Select Ward (${displayWards.length} available)`
+              }
+            </option>
+            {displayWards.map((ward) => (
               <option key={ward.id} value={ward.id}>
                 {ward.name}
               </option>
@@ -222,7 +323,6 @@ const LocationSection = ({
         </div>
       </div>
 
-      {/* Help Text */}
       <div className="mt-4 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="font-medium">Location Selection Guide:</p>
         <p>Select your county first, then sub-county, then ward. Use "Auto Detect My Location" for automatic filling.</p>

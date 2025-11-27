@@ -1,48 +1,126 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { useNotification } from '../../context/NotificationContext';
-import Layout from '../../components/common/Layout';
-import reportService from '../../services/api/reportService'; 
+// src/pages/reports/ReportDetail.jsx - COMPLETE REWRITTEN VERSION
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { useNotification } from "../../context/NotificationContext";
+import Layout from "../../components/common/Layout";
+import ConfirmationModal from "../../components/common/ConfirmationModal";
+import EditCommentModal from "../../components/common/EditCommentModal";
+import reportService from "../../services/api/reportService";
+import commentService from "../../services/api/commentService";
 
 const ReportDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { showSuccess, showError, showInfo } = useNotification();
+
+  // State management
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState("");
+
+  // Comment functionality state
+  const [comments, setComments] = useState([]);
+  const [citizenComments, setCitizenComments] = useState([]);
+  const [officialComments, setOfficialComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [activeCommentTab, setActiveCommentTab] = useState("all");
+
+  // Modal states
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    commentId: null,
+    commentContent: "",
+  });
+  const [editModal, setEditModal] = useState({
+    isOpen: false,
+    comment: null,
+  });
+
+  // Image modal state
+  const [imageModal, setImageModal] = useState({
+    isOpen: false,
+    image: null,
+    index: 0,
+  });
 
   useEffect(() => {
     fetchReport();
+    fetchComments();
   }, [id]);
 
   const fetchReport = async () => {
     try {
       setLoading(true);
-      
       const data = await reportService.getReport(id);
-      console.log('Full Report Data:', data);
-      
       setReport(data);
       setSelectedStatus(data.status);
     } catch (err) {
-      console.error('Failed to fetch report:', err);
-      console.error('Error response:', err.response?.data);
-      
+      console.error("Failed to fetch report:", err);
+
       if (err.response?.status === 404) {
-        showError('Report not found', 'Report Error');
+        showError("Report not found", "Report Error");
       } else if (err.response?.status === 401) {
-        showError('Please log in to view report details', 'Authentication Required');
+        showError(
+          "Please log in to view report details",
+          "Authentication Required"
+        );
       } else if (err.response?.status === 403) {
-        showError('You do not have permission to view this report', 'Access Denied');
+        showError(
+          "You do not have permission to view this report",
+          "Access Denied"
+        );
       } else {
-        showError('Failed to load report. Please try again.', 'Loading Error');
+        showError("Failed to load report. Please try again.", "Loading Error");
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchComments = async () => {
+    try {
+      setLoadingComments(true);
+      const response = await commentService.getCommentsByReport(id);
+
+      // Handle different API response structures
+      let commentsData = [];
+
+      if (Array.isArray(response)) {
+        commentsData = response;
+      } else if (response && Array.isArray(response.results)) {
+        commentsData = response.results;
+      } else if (response && Array.isArray(response.data)) {
+        commentsData = response.data;
+      } else {
+        console.warn("Unexpected comments response structure:", response);
+        commentsData = [];
+      }
+
+      setComments(commentsData);
+
+      // Separate comments by type
+      const citizens = commentsData.filter(
+        (comment) => comment && comment.comment_type === "citizen"
+      );
+      const officials = commentsData.filter(
+        (comment) => comment && comment.comment_type === "official"
+      );
+
+      setCitizenComments(citizens);
+      setOfficialComments(officials);
+    } catch (error) {
+      console.error("Failed to load comments:", error);
+      showError("Failed to load comments", "Comments Error");
+      setComments([]);
+      setCitizenComments([]);
+      setOfficialComments([]);
+    } finally {
+      setLoadingComments(false);
     }
   };
 
@@ -51,184 +129,479 @@ const ReportDetail = () => {
 
     try {
       setUpdatingStatus(true);
-      
-      const updatedReport = await reportService.updateReportStatus(id, selectedStatus);
+      const updatedReport = await reportService.updateReportStatus(
+        id,
+        selectedStatus
+      );
       setReport(updatedReport);
-      
-      showSuccess('Status updated successfully!', 'Report Updated');
+      showSuccess("Status updated successfully", "Report Updated");
     } catch (err) {
-      console.error('Status update failed:', err);
-      showError(err.response?.data?.detail || 'Failed to update status', 'Update Error');
+      console.error("Status update failed:", err);
+      showError(
+        err.response?.data?.detail || "Failed to update status",
+        "Update Error"
+      );
     } finally {
       setUpdatingStatus(false);
     }
   };
 
-  const canUpdateStatus = user && (
-    user.role === 'county_official' || 
-    user.role === 'admin' || 
-    user.role === 'superadmin'
-  );
+  const handleSubmitComment = async (e) => {
+    e.preventDefault();
 
-  const isReporter = user && report && user.id === report.reporter;
+    if (!isAuthenticated || !user) {
+      showError("Please log in to comment", "Authentication Required");
+      navigate("/login", { state: { from: `/reports/${id}` } });
+      return;
+    }
 
+    if (!newComment.trim()) {
+      showError("Comment cannot be empty", "Validation Error");
+      return;
+    }
+
+    try {
+      setSubmittingComment(true);
+
+      const userCommentType =
+        user.role === "county_official" ||
+        user.role === "admin" ||
+        user.role === "superadmin"
+          ? "official"
+          : "citizen";
+
+      const commentData = {
+        report: id,
+        comment_type: userCommentType,
+        content: newComment.trim(),
+        parent: null,
+      };
+
+      await commentService.createComment(commentData);
+
+      setNewComment("");
+      await fetchComments();
+
+      showSuccess("Comment added successfully", "Comment Posted");
+
+      if (userCommentType === "official") {
+        showInfo(
+          "Official response has been recorded and notifications sent",
+          "Official Response"
+        );
+      }
+    } catch (error) {
+      console.error("Failed to submit comment:", error);
+
+      if (error.response?.status === 401) {
+        showError(
+          "Session expired. Please log in again.",
+          "Authentication Error"
+        );
+        navigate("/login", { state: { from: `/reports/${id}` } });
+      } else if (error.response?.status === 400) {
+        const errorData = error.response.data;
+        if (typeof errorData === "object") {
+          const errorMessages = Object.values(errorData).flat().join(", ");
+          showError(`Validation error: ${errorMessages}`, "Validation Error");
+        } else {
+          showError(
+            "Invalid comment data. Please check your input.",
+            "Validation Error"
+          );
+        }
+      } else if (error.response?.status === 403) {
+        showError(
+          "You do not have permission to post this type of comment.",
+          "Permission Error"
+        );
+      } else if (error.response?.status === 429) {
+        showError(
+          "Too many comments. Please wait before posting again.",
+          "Rate Limit"
+        );
+      } else if (error.response?.status === 500) {
+        showError("Server error. Please try again later.", "Server Error");
+      } else {
+        showError(
+          "Failed to submit comment. Please try again.",
+          "Comment Error"
+        );
+      }
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  // Comment management functions
+  const handleDeleteClick = (comment) => {
+    setDeleteModal({
+      isOpen: true,
+      commentId: comment.id,
+      commentContent:
+        comment.content.substring(0, 100) +
+        (comment.content.length > 100 ? "..." : ""),
+    });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteModal.commentId) return;
+
+    try {
+      await commentService.deleteComment(deleteModal.commentId);
+      await fetchComments();
+      showSuccess("Comment deleted successfully", "Comment Deleted");
+    } catch (error) {
+      console.error("Failed to delete comment:", error);
+
+      if (error.response?.status === 403) {
+        showError(
+          "You don't have permission to delete this comment",
+          "Permission Denied"
+        );
+      } else {
+        showError("Failed to delete comment", "Delete Error");
+      }
+    } finally {
+      setDeleteModal({ isOpen: false, commentId: null, commentContent: "" });
+    }
+  };
+
+  const handleEditClick = (comment) => {
+    setEditModal({
+      isOpen: true,
+      comment: comment,
+    });
+  };
+
+  const handleEditSave = async (newContent) => {
+    if (!editModal.comment) return;
+
+    try {
+      await commentService.updateComment(editModal.comment.id, {
+        content: newContent,
+      });
+      await fetchComments();
+      showSuccess("Comment updated successfully", "Comment Updated");
+    } catch (error) {
+      console.error("Failed to update comment:", error);
+      showError("Failed to update comment", "Update Error");
+      throw error;
+    }
+  };
+
+  // Image modal functions
+  const handleImageClick = (image, index) => {
+    setImageModal({
+      isOpen: true,
+      image: image,
+      index: index,
+    });
+  };
+
+  const handleNextImage = () => {
+    if (!report.images) return;
+    const nextIndex = (imageModal.index + 1) % report.images.length;
+    setImageModal((prev) => ({
+      ...prev,
+      image: report.images[nextIndex],
+      index: nextIndex,
+    }));
+  };
+
+  const handlePrevImage = () => {
+    if (!report.images) return;
+    const prevIndex =
+      (imageModal.index - 1 + report.images.length) % report.images.length;
+    setImageModal((prev) => ({
+      ...prev,
+      image: report.images[prevIndex],
+      index: prevIndex,
+    }));
+  };
+
+  // Enhanced permission checking functions
+  const canDeleteComment = (comment) => {
+    if (!user || !comment) return false;
+
+    // Check if current user is the comment author
+    const isAuthor = user.id === comment.user?.id || user.id === comment.user;
+
+    // Check user roles for admin permissions
+    const hasAdminPermission =
+      user.role === "admin" ||
+      user.role === "superadmin" ||
+      user.role === "county_official";
+
+    return isAuthor || hasAdminPermission;
+  };
+
+  const canEditComment = (comment) => {
+    if (!user || !comment) return false;
+
+    // Check if current user is the comment author
+    const isAuthor = user.id === comment.user?.id || user.id === comment.user;
+
+    if (!isAuthor) return false;
+
+    // Use the can_edit property from API if available
+    if (comment.can_edit !== undefined) {
+      return comment.can_edit;
+    }
+
+    // Fallback: Check if comment was created within last 15 minutes
+    if (comment.created_at) {
+      try {
+        const commentTime = new Date(comment.created_at);
+        const currentTime = new Date();
+        const timeDiff = (currentTime - commentTime) / (1000 * 60); // difference in minutes
+        return timeDiff <= 15; // 15 minutes editing window
+      } catch (error) {
+        console.warn("Error calculating edit window:", error);
+        return false;
+      }
+    }
+
+    return false; // Default to false for safety
+  };
+
+  const canUpdateStatus =
+    user &&
+    (user.role === "county_official" ||
+      user.role === "admin" ||
+      user.role === "superadmin");
+  // Helper functions
   const getStatusColor = (status) => {
     const colors = {
-      submitted: 'bg-blue-100 text-blue-800 border-blue-200',
-      verified: 'bg-green-100 text-green-800 border-green-200',
-      pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      noted: 'bg-purple-100 text-purple-800 border-purple-200',
-      on_progress: 'bg-orange-100 text-orange-800 border-orange-200',
-      resolved: 'bg-green-100 text-green-800 border-green-200',
-      rejected: 'bg-red-100 text-red-800 border-red-200',
-      deleted: 'bg-gray-100 text-gray-800 border-gray-200'
+      submitted: "bg-blue-100 text-blue-800 border-blue-200",
+      verified: "bg-green-100 text-green-800 border-green-200",
+      pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      noted: "bg-purple-100 text-purple-800 border-purple-200",
+      on_progress: "bg-orange-100 text-orange-800 border-orange-200",
+      resolved: "bg-green-100 text-green-800 border-green-200",
+      rejected: "bg-red-100 text-red-800 border-red-200",
+      deleted: "bg-gray-100 text-gray-800 border-gray-200",
     };
-    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+    return colors[status] || "bg-gray-100 text-gray-800 border-gray-200";
   };
 
   const getStatusDisplay = (status) => {
     const displays = {
-      submitted: 'Submitted',
-      verified: 'Verified (AI Confirmed)',
-      pending: 'Pending County Review',
-      noted: 'Noted by Official',
-      on_progress: 'In Progress',
-      resolved: 'Resolved',
-      rejected: 'Rejected',
-      deleted: 'Deleted'
+      submitted: "Submitted",
+      verified: "Verified",
+      pending: "Pending Review",
+      noted: "Noted",
+      on_progress: "In Progress",
+      resolved: "Resolved",
+      rejected: "Rejected",
+      deleted: "Deleted",
     };
     return displays[status] || status;
   };
 
-  const getDepartmentIcon = (departmentName) => {
-    const icons = {
-      'health': (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-        </svg>
-      ),
-      'education': (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14v6l-9-5m9 5l9-5m-9 5v-6m9 5l-9-5m9 5l-9-5" />
-        </svg>
-      ),
-      'roads': (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-      ),
-      'security': (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-        </svg>
-      ),
-      'agriculture': (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9a9 9 0 01-9-9m9 9c0 5-4 9-9 9s-9-4-9-9m9-9a9 9 0 00-9 9" />
-        </svg>
-      ),
-      'environment': (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      'water': (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-        </svg>
-      )
-    };
-
-    if (!departmentName) return (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    );
-    
-    const deptLower = departmentName.toLowerCase();
-    for (const [key, icon] of Object.entries(icons)) {
-      if (deptLower.includes(key)) {
-        return icon;
-      }
-    }
-    
-    // Default icon for other departments
-    return (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    );
-  };
-
   const getDepartmentColor = (departmentName) => {
     const colors = {
-      'health': 'bg-red-50 border-red-200 text-red-800',
-      'education': 'bg-blue-50 border-blue-200 text-blue-800',
-      'roads': 'bg-yellow-50 border-yellow-200 text-yellow-800',
-      'security': 'bg-gray-50 border-gray-200 text-gray-800',
-      'agriculture': 'bg-green-50 border-green-200 text-green-800',
-      'environment': 'bg-emerald-50 border-emerald-200 text-emerald-800',
-      'water': 'bg-cyan-50 border-cyan-200 text-cyan-800',
-      'finance': 'bg-purple-50 border-purple-200 text-purple-800',
-      'housing': 'bg-orange-50 border-orange-200 text-orange-800',
-      'ict': 'bg-indigo-50 border-indigo-200 text-indigo-800',
-      'transport': 'bg-amber-50 border-amber-200 text-amber-800',
-      'trade': 'bg-lime-50 border-lime-200 text-lime-800',
-      'public service': 'bg-slate-50 border-slate-200 text-slate-800'
+      health: "bg-red-50 border-red-200 text-red-800",
+      education: "bg-blue-50 border-blue-200 text-blue-800",
+      roads: "bg-yellow-50 border-yellow-200 text-yellow-800",
+      security: "bg-gray-50 border-gray-200 text-gray-800",
+      agriculture: "bg-green-50 border-green-200 text-green-800",
+      environment: "bg-emerald-50 border-emerald-200 text-emerald-800",
+      water: "bg-cyan-50 border-cyan-200 text-cyan-800",
     };
 
-    if (!departmentName) return 'bg-gray-50 border-gray-200 text-gray-800';
-    
+    if (!departmentName) return "bg-gray-50 border-gray-200 text-gray-800";
+
     const deptLower = departmentName.toLowerCase();
     for (const [key, color] of Object.entries(colors)) {
       if (deptLower.includes(key)) {
         return color;
       }
     }
-    
-    return 'bg-gray-50 border-gray-200 text-gray-800';
+
+    return "bg-gray-50 border-gray-200 text-gray-800";
   };
 
   const formatDateTime = (dateString) => {
-    return new Date(dateString).toLocaleString('en-KE', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      return new Date(dateString).toLocaleString("en-KE", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (error) {
+      return "Invalid date";
+    }
   };
 
-  // Safe data access functions
   const getCountyName = () => {
-    if (!report) return 'Not specified';
-    return report.county_name || (report.county && typeof report.county === 'object' ? report.county.name : 'Not specified');
+    if (!report) return "Not specified";
+    return (
+      report.county_name ||
+      (report.county && typeof report.county === "object"
+        ? report.county.name
+        : "Not specified")
+    );
   };
 
   const getSubcountyName = () => {
     if (!report) return null;
-    return report.subcounty_name || (report.subcounty && typeof report.subcounty === 'object' ? report.subcounty.name : null);
+    return (
+      report.subcounty_name ||
+      (report.subcounty && typeof report.subcounty === "object"
+        ? report.subcounty.name
+        : null)
+    );
   };
 
   const getWardName = () => {
     if (!report) return null;
-    return report.ward_name || (report.ward && typeof report.ward === 'object' ? report.ward.name : null);
+    return (
+      report.ward_name ||
+      (report.ward && typeof report.ward === "object" ? report.ward.name : null)
+    );
   };
 
   const getDepartmentName = () => {
-    if (!report) return 'Not assigned';
-    return report.department_name || 
-           (report.department && typeof report.department === 'object' ? 
-            (report.department.department?.name || report.department.name) : 'Not assigned');
+    if (!report) return "Not assigned";
+    return (
+      report.department_name ||
+      (report.department && typeof report.department === "object"
+        ? report.department.department?.name || report.department.name
+        : "Not assigned")
+    );
   };
 
   const getImageUrl = (image) => {
-    if (!image) return '/placeholder-image.jpg';
-    return image.image_url || image.image || '/placeholder-image.jpg';
+    if (!image) return "/placeholder-image.jpg";
+    return image.image_url || image.image || "/placeholder-image.jpg";
   };
 
+  // Render functions
+  const renderComments = (commentsToRender) => {
+    const safeComments = Array.isArray(commentsToRender)
+      ? commentsToRender
+      : [];
+
+    if (safeComments.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-500">
+          <svg
+            className="w-16 h-16 mx-auto text-gray-400 mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1}
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            />
+          </svg>
+          <p>No comments yet. Be the first to share your thoughts!</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {safeComments.map((comment) => (
+          <div
+            key={comment.id}
+            className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors duration-200"
+          >
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                    {comment.user_display_name?.charAt(0) || "U"}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold text-gray-900">
+                      {comment.user_display_name ||
+                        `${comment.user?.first_name || ""} ${
+                          comment.user?.last_name || ""
+                        }`.trim() ||
+                        "Anonymous User"}
+                    </span>
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        comment.comment_type === "official"
+                          ? "bg-blue-100 text-blue-800 border border-blue-200"
+                          : "bg-gray-100 text-gray-800 border border-gray-200"
+                      }`}
+                    >
+                      {comment.comment_type === "official"
+                        ? "Official Response"
+                        : "Citizen Comment"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {formatDateTime(comment.created_at)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {canDeleteComment(comment) && (
+                  <button
+                    onClick={() => handleDeleteClick(comment)}
+                    className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors p-1 rounded hover:bg-red-50"
+                    title="Delete comment"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  </button>
+                )}
+                {canEditComment(comment) && (
+                  <button
+                    onClick={() => handleEditClick(comment)}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors p-1 rounded hover:bg-blue-50"
+                    title="Edit comment"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+              {comment.content}
+            </p>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Loading and error states
   if (loading) {
     return (
       <Layout>
@@ -247,16 +620,16 @@ const ReportDetail = () => {
       <Layout>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center max-w-md mx-auto">
-            <div className="text-6xl mb-4">❌</div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               Report Not Found
             </h2>
             <p className="text-gray-600 mb-6">
-              The report you're looking for doesn't exist or you don't have permission to view it.
+              The report you're looking for doesn't exist or you don't have
+              permission to view it.
             </p>
             <div className="flex gap-4 justify-center">
               <button
-                onClick={() => navigate('/reports')}
+                onClick={() => navigate("/reports")}
                 className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
               >
                 Back to Reports
@@ -272,193 +645,497 @@ const ReportDetail = () => {
     <Layout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-            <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-6">
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          {/* Header Section */}
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
+            <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-8">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(report.status)}`}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span
+                      className={`px-4 py-2 rounded-full text-sm font-semibold border ${getStatusColor(
+                        report.status
+                      )}`}
+                    >
                       {getStatusDisplay(report.status)}
                     </span>
                     {report.verified_by_ai && (
-                      <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      <span className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                        <svg
+                          className="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                         AI Verified
                       </span>
                     )}
                   </div>
-                  <h1 className="text-2xl lg:text-3xl font-bold text-white">{report.title}</h1>
-                  <p className="text-green-100 mt-2 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Reported by {report.reporter_name || 'Unknown'} • {formatDateTime(report.created_at)}
-                  </p>
+                  <h1 className="text-2xl lg:text-4xl font-bold text-white mb-3">
+                    {report.title}
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-4 text-green-100">
+                    <span className="flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        />
+                      </svg>
+                      {report.reporter_name || "Unknown"}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      {formatDateTime(report.created_at)}
+                    </span>
+                  </div>
                 </div>
-                <button
-                  onClick={() => navigate('/reports')}
-                  className="bg-white text-green-600 px-4 py-2 rounded-lg font-semibold hover:bg-green-50 transition-colors flex items-center gap-2 whitespace-nowrap"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  Back to Reports
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => navigate("/reports")}
+                    className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-green-50 transition-colors flex items-center gap-2"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                      />
+                    </svg>
+                    Back to Reports
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-8">
               {/* Description Card */}
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <svg
+                    className="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                   Issue Description
                 </h2>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{report.description}</p>
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-lg">
+                    {report.description}
+                  </p>
                 </div>
               </div>
 
               {/* Images Gallery */}
               {report.images && report.images.length > 0 && (
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <svg
+                      className="w-5 h-5 text-gray-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
                     </svg>
                     Evidence Photos ({report.images.length})
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {report.images.map((image, index) => (
                       <div key={image.id} className="relative group">
-                        <div className="aspect-square overflow-hidden rounded-lg border border-gray-200">
+                        <div className="aspect-square overflow-hidden rounded-lg border border-gray-200 cursor-pointer transform transition-transform duration-200 hover:scale-105">
                           <img
                             src={getImageUrl(image)}
                             alt={image.caption || `Evidence ${index + 1}`}
-                            className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105"
-                            onClick={() => window.open(getImageUrl(image), '_blank')}
+                            className="w-full h-full object-cover"
+                            onClick={() => handleImageClick(image, index)}
                             onError={(e) => {
-                              e.target.src = '/placeholder-image.jpg';
+                              e.target.src = "/placeholder-image.jpg";
                             }}
                           />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
+                            <svg
+                              className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m0 0l3-3m-3 3L7 13"
+                              />
+                            </svg>
+                          </div>
                         </div>
                         {image.caption && (
-                          <p className="text-sm text-gray-600 mt-2 text-center">{image.caption}</p>
+                          <p className="text-sm text-gray-600 mt-2 text-center line-clamp-2">
+                            {image.caption}
+                          </p>
                         )}
-                        <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                          Click to enlarge
-                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* AI Verification Details */}
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              {/* Comments Section */}
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+                id="comments"
+              >
+                <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                  <svg
+                    className="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
                   </svg>
-                  AI Analysis & Verification
+                  Comments & Responses
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-sm font-medium text-blue-800">AI Verification</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        report.verified_by_ai ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {report.verified_by_ai ? 'Verified' : 'Not Verified'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-sm font-medium text-blue-800">Confidence Score</span>
-                      <span className="text-sm font-semibold text-blue-800">
-                        {report.ai_confidence ? `${(report.ai_confidence * 100).toFixed(1)}%` : 'N/A'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-green-800 mb-2">AI Benefits</h4>
-                    <ul className="text-sm text-green-700 space-y-1">
-                      <li>• Automatic department classification</li>
-                      <li>• Faster processing times</li>
-                      <li>• Reduced manual review needed</li>
-                      {report.verified_by_ai && (
-                        <li>• This report was automatically verified</li>
+
+                {/* Add Comment Form */}
+                {isAuthenticated && (
+                  <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-200">
+                    <form onSubmit={handleSubmitComment}>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Add{" "}
+                          {user.role !== "citizen"
+                            ? "Official Response"
+                            : "Comment"}
+                        </label>
+                        <textarea
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          placeholder={
+                            user.role !== "citizen"
+                              ? "Add official response..."
+                              : "Share your thoughts or suggestions..."
+                          }
+                          rows="4"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                          required
+                        />
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                          Commenting as:{" "}
+                          {user.role === "citizen"
+                            ? "Citizen"
+                            : "County Official"}
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={submittingComment || !newComment.trim()}
+                          className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 min-w-32 justify-center"
+                        >
+                          {submittingComment ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Posting...
+                            </>
+                          ) : user.role !== "citizen" ? (
+                            "Post Response"
+                          ) : (
+                            "Post Comment"
+                          )}
+                        </button>
+                      </div>
+                      {user.role !== "citizen" && (
+                        <p className="text-xs text-blue-600 mt-3 flex items-center gap-1">
+                          <svg
+                            className="w-3 h-3"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          Official responses will trigger email notifications to
+                          relevant parties.
+                        </p>
                       )}
-                    </ul>
+                    </form>
+                  </div>
+                )}
+
+                {/* Comment Tabs */}
+                <div className="mb-6">
+                  <div className="flex border-b border-gray-200">
+                    <button
+                      onClick={() => setActiveCommentTab("all")}
+                      className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+                        activeCommentTab === "all"
+                          ? "border-green-600 text-green-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      All Comments
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          activeCommentTab === "all"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {comments.length}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setActiveCommentTab("official")}
+                      className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+                        activeCommentTab === "official"
+                          ? "border-blue-600 text-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Official Responses
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          activeCommentTab === "official"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {officialComments.length}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setActiveCommentTab("citizen")}
+                      className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+                        activeCommentTab === "citizen"
+                          ? "border-gray-600 text-gray-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Citizen Comments
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          activeCommentTab === "citizen"
+                            ? "bg-gray-100 text-gray-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {citizenComments.length}
+                      </span>
+                    </button>
                   </div>
                 </div>
+
+                {/* Comments List */}
+                {loadingComments ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                    <span className="ml-3 text-gray-600">
+                      Loading comments...
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    {activeCommentTab === "all" && renderComments(comments)}
+                    {activeCommentTab === "official" &&
+                      renderComments(officialComments)}
+                    {activeCommentTab === "citizen" &&
+                      renderComments(citizenComments)}
+                  </>
+                )}
+
+                {!isAuthenticated && (
+                  <div className="text-center py-8">
+                    <div className="bg-gray-50 rounded-xl p-6 max-w-md mx-auto">
+                      <svg
+                        className="w-12 h-12 text-gray-400 mx-auto mb-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1}
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
+                      </svg>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        Join the Conversation
+                      </h3>
+                      <p className="text-gray-600 mb-4">
+                        Please log in to comment on this report.
+                      </p>
+                      <button
+                        onClick={() =>
+                          navigate("/login", {
+                            state: { from: `/reports/${id}` },
+                          })
+                        }
+                        className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                      >
+                        Log In to Comment
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Location Details */}
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <svg
+                    className="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
                   </svg>
                   Location Details
                 </h2>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm font-medium text-gray-700">County</span>
-                    <span className="font-semibold text-gray-900">{getCountyName()}</span>
+                    <span className="text-sm font-medium text-gray-700">
+                      County
+                    </span>
+                    <span className="font-semibold text-gray-900">
+                      {getCountyName()}
+                    </span>
                   </div>
                   {getSubcountyName() && (
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-700">Sub-County</span>
-                      <span className="font-semibold text-gray-900">{getSubcountyName()}</span>
+                      <span className="text-sm font-medium text-gray-700">
+                        Sub-County
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {getSubcountyName()}
+                      </span>
                     </div>
                   )}
                   {getWardName() && (
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-700">Ward</span>
-                      <span className="font-semibold text-gray-900">{getWardName()}</span>
-                    </div>
-                  )}
-                  {report.latitude && report.longitude && (
-                    <div className="p-3 bg-blue-50 rounded-lg">
-                      <p className="text-sm font-medium text-blue-800 mb-1">GPS Coordinates</p>
-                      <p className="text-sm font-mono text-blue-900">
-                        {report.latitude}, {report.longitude}
-                      </p>
+                      <span className="text-sm font-medium text-gray-700">
+                        Ward
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {getWardName()}
+                      </span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Department Assignment */}
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  <svg
+                    className="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                    />
                   </svg>
                   Responsible Department
                 </h2>
-                <div className={`border rounded-lg p-4 text-center ${getDepartmentColor(getDepartmentName())}`}>
-                  <div className="flex justify-center mb-2">
-                    {getDepartmentIcon(getDepartmentName())}
-                  </div>
-                  <p className="font-semibold text-lg">
+                <div
+                  className={`border-2 rounded-xl p-4 text-center ${getDepartmentColor(
+                    getDepartmentName()
+                  )}`}
+                >
+                  <p className="font-semibold text-lg mb-2">
                     {getDepartmentName()}
                   </p>
-                  {getDepartmentName() !== 'Not assigned' && (
-                    <p className="text-sm mt-2">
-                      This department is responsible for addressing the reported issue
+                  {getDepartmentName() !== "Not assigned" && (
+                    <p className="text-sm opacity-75">
+                      This department is responsible for addressing the reported
+                      issue
                     </p>
                   )}
                 </div>
@@ -466,31 +1143,43 @@ const ReportDetail = () => {
 
               {/* Status Update (for officials) */}
               {canUpdateStatus && (
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <svg
+                      className="w-5 h-5 text-gray-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
                     Update Status
                   </h2>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <select
                       value={selectedStatus}
                       onChange={(e) => setSelectedStatus(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
                       <option value="submitted">Submitted</option>
                       <option value="verified">Verified</option>
                       <option value="pending">Pending Review</option>
-                      <option value="noted">Noted by Official</option>
+                      <option value="noted">Noted</option>
                       <option value="on_progress">In Progress</option>
                       <option value="resolved">Resolved</option>
                       <option value="rejected">Rejected</option>
                     </select>
                     <button
                       onClick={handleStatusUpdate}
-                      disabled={updatingStatus || selectedStatus === report.status}
-                      className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                      disabled={
+                        updatingStatus || selectedStatus === report.status
+                      }
+                      className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
                     >
                       {updatingStatus ? (
                         <>
@@ -498,73 +1187,179 @@ const ReportDetail = () => {
                           Updating...
                         </>
                       ) : (
-                        'Update Status'
+                        "Update Status"
                       )}
                     </button>
-                    {selectedStatus !== report.status && (
-                      <p className="text-xs text-gray-500 text-center">
-                        Changing from <strong>{getStatusDisplay(report.status)}</strong> to <strong>{getStatusDisplay(selectedStatus)}</strong>
-                      </p>
-                    )}
                   </div>
                 </div>
               )}
 
               {/* Report Metadata */}
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   Report Information
                 </h2>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600">Report ID:</span>
-                    <span className="font-mono text-gray-900 text-xs">{report.id}</span>
+                    <span className="font-mono text-gray-900 text-xs bg-gray-100 px-2 py-1 rounded">
+                      {report.id.substring(0, 8)}...
+                    </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600">Created:</span>
-                    <span className="text-gray-900">{formatDateTime(report.created_at)}</span>
+                    <span className="text-gray-900">
+                      {formatDateTime(report.created_at)}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600">Last Updated:</span>
-                    <span className="text-gray-900">{formatDateTime(report.updated_at)}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Reporter Role:</span>
-                    <span className="text-gray-900 capitalize">{report.role_at_submission?.replace('_', ' ')}</span>
+                    <span className="text-gray-900">
+                      {formatDateTime(report.updated_at)}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600">Images Provided:</span>
-                    <span className="text-gray-900">{report.images?.length || 0}</span>
+                    <span className="text-gray-900 font-semibold">
+                      {report.images?.length || 0}
+                    </span>
                   </div>
                 </div>
               </div>
-
-              {/* Reporter Actions */}
-              {isReporter && (
-                <div className="bg-white rounded-lg border border-gray-200 p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Actions</h2>
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => navigate('/my-reports')}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-semibold transition-colors"
-                    >
-                      View My Reports
-                    </button>
-                    <button
-                      onClick={() => navigate('/reports/create')}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-semibold transition-colors"
-                    >
-                      Report New Issue
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
+
+        {/* Modals */}
+        <ConfirmationModal
+          isOpen={deleteModal.isOpen}
+          onClose={() =>
+            setDeleteModal({
+              isOpen: false,
+              commentId: null,
+              commentContent: "",
+            })
+          }
+          onConfirm={handleDeleteConfirm}
+          title="Delete Comment"
+          message={`Are you sure you want to delete this comment? This action cannot be undone.`}
+          confirmText="Delete Comment"
+          cancelText="Keep Comment"
+          type="error"
+        />
+
+        <EditCommentModal
+          isOpen={editModal.isOpen}
+          onClose={() => setEditModal({ isOpen: false, comment: null })}
+          onSave={handleEditSave}
+          comment={editModal.comment}
+        />
+
+        {/* Image Modal */}
+        {imageModal.isOpen && imageModal.image && (
+          <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4 z-50">
+            <div className="relative max-w-4xl max-h-full w-full">
+              <button
+                onClick={() =>
+                  setImageModal({ isOpen: false, image: null, index: 0 })
+                }
+                className="absolute top-4 right-4 text-white hover:text-gray-300 z-10 bg-black bg-opacity-50 rounded-full p-2"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+
+              {report.images.length > 1 && (
+                <>
+                  <button
+                    onClick={handlePrevImage}
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10 bg-black bg-opacity-50 rounded-full p-2"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={handleNextImage}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10 bg-black bg-opacity-50 rounded-full p-2"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  </button>
+                </>
+              )}
+
+              <div className="flex flex-col items-center">
+                <img
+                  src={getImageUrl(imageModal.image)}
+                  alt={
+                    imageModal.image.caption ||
+                    `Evidence ${imageModal.index + 1}`
+                  }
+                  className="max-w-full max-h-[80vh] object-contain rounded-lg"
+                  onError={(e) => {
+                    e.target.src = "/placeholder-image.jpg";
+                  }}
+                />
+                {imageModal.image.caption && (
+                  <p className="text-white text-center mt-4 text-lg max-w-2xl">
+                    {imageModal.image.caption}
+                  </p>
+                )}
+                {report.images.length > 1 && (
+                  <p className="text-white text-center mt-2 text-sm">
+                    {imageModal.index + 1} of {report.images.length}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

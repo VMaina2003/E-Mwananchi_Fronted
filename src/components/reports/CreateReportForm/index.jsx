@@ -9,12 +9,17 @@ import MediaSection from "./MediaSection";
 import AIFeedback from "./AIFeedback";
 import locationService from "../../../services/api/locationService";
 
-const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => {
+const CreateReportForm = ({
+  onSubmissionStart,
+  onSubmissionComplete,
+  user,
+}) => {
   const navigate = useNavigate();
-  const { showSuccess, showError, showInfo, showWarning } = useNotification();
-  const { createReport, analyzeReport, loading, error, clearError } = useReports();
+  const { showError, showInfo, showWarning } = useNotification();
+  const { createReport, analyzeReport, loading, error, clearError } =
+    useReports();
 
-  // Form state
+  // Form state with comprehensive validation
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -26,173 +31,229 @@ const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => 
     longitude: "",
     images: [],
     priority: "medium",
+    is_anonymous: false,
+    anonymous_display_name: "Anonymous Citizen",
   });
 
   // UI state
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
-  const [counties, setCounties] = useState([]);
-  const [subCounties, setSubCounties] = useState([]);
-  const [wards, setWards] = useState([]);
-  const [departments, setDepartments] = useState([]);
+  const [locationData, setLocationData] = useState({
+    counties: [],
+    subCounties: [],
+    wards: [],
+    departments: [],
+  });
+  const [loadingStates, setLoadingStates] = useState({
+    counties: false,
+    subCounties: false,
+    wards: false,
+    departments: false,
+  });
 
-  // Loading states
-  const [loadingCounties, setLoadingCounties] = useState(false);
-  const [loadingSubCounties, setLoadingSubCounties] = useState(false);
-  const [loadingWards, setLoadingWards] = useState(false);
-  const [loadingDepartments, setLoadingDepartments] = useState(false);
-
-  // Load counties and departments on component mount
+  // Load initial data
   useEffect(() => {
-    fetchCounties();
-    fetchDepartments();
+    const initializeData = async () => {
+      try {
+        await Promise.all([fetchCounties(), fetchDepartments()]);
+      } catch (error) {
+        showError(
+          "Failed to load required data. Please refresh the page.",
+          "Initialization Error"
+        );
+      }
+    };
+
+    initializeData();
   }, []);
 
-  // Load sub-counties when county changes
-  useEffect(() => {
-    if (formData.county) {
-      setFormData((prev) => ({
-        ...prev,
-        subcounty: "",
-        ward: "",
-      }));
-      fetchSubCounties(formData.county);
-    } else {
-      setSubCounties([]);
-      setWards([]);
-    }
-  }, [formData.county]);
-
-  // Load wards when sub-county changes
-  useEffect(() => {
-    if (formData.subcounty) {
-      setFormData((prev) => ({ ...prev, ward: "" }));
-      fetchWards(formData.subcounty);
-    } else {
-      setWards([]);
-    }
-  }, [formData.subcounty]);
-
-  // Data fetching functions
+  // Location data fetching with error handling
   const fetchCounties = async () => {
-    setLoadingCounties(true);
+    setLoadingStates((prev) => ({ ...prev, counties: true }));
     try {
       const data = await locationService.getCounties();
-      setCounties(data);
+      setLocationData((prev) => ({ ...prev, counties: data }));
     } catch (error) {
       console.error("Failed to fetch counties:", error);
-      setValidationErrors((prev) => ({
-        ...prev,
-        fetchError: "Failed to load counties. Please refresh the page.",
-      }));
+      showError(
+        "Failed to load counties. Please try again.",
+        "Location Data Error"
+      );
     } finally {
-      setLoadingCounties(false);
+      setLoadingStates((prev) => ({ ...prev, counties: false }));
     }
   };
 
   const fetchSubCounties = async (countyId) => {
-    setLoadingSubCounties(true);
+    setLoadingStates((prev) => ({ ...prev, subCounties: true }));
     try {
       const data = await locationService.getSubcounties(countyId);
-      setSubCounties(data);
+      setLocationData((prev) => ({ ...prev, subCounties: data }));
     } catch (error) {
       console.error("Failed to fetch sub-counties:", error);
-      setValidationErrors((prev) => ({
-        ...prev,
-        fetchError: "Failed to load sub-counties.",
-      }));
+      showWarning(
+        "Failed to load sub-counties for selected county.",
+        "Location Data"
+      );
     } finally {
-      setLoadingSubCounties(false);
+      setLoadingStates((prev) => ({ ...prev, subCounties: false }));
     }
   };
 
   const fetchWards = async (subCountyId) => {
-    setLoadingWards(true);
+    setLoadingStates((prev) => ({ ...prev, wards: true }));
     try {
       const data = await locationService.getWards(subCountyId);
-      setWards(data);
+      setLocationData((prev) => ({ ...prev, wards: data }));
     } catch (error) {
       console.error("Failed to fetch wards:", error);
-      setValidationErrors((prev) => ({
-        ...prev,
-        fetchError: "Failed to load wards.",
-      }));
+      showWarning(
+        "Failed to load wards for selected sub-county.",
+        "Location Data"
+      );
     } finally {
-      setLoadingWards(false);
+      setLoadingStates((prev) => ({ ...prev, wards: false }));
     }
   };
 
   const fetchDepartments = async () => {
-    setLoadingDepartments(true);
+    setLoadingStates((prev) => ({ ...prev, departments: true }));
     try {
       const data = await locationService.getDepartments();
-      setDepartments(data);
+      setLocationData((prev) => ({ ...prev, departments: data }));
     } catch (error) {
       console.error("Failed to fetch departments:", error);
-      setValidationErrors((prev) => ({
-        ...prev,
-        fetchError: "Failed to load departments.",
-      }));
+      showWarning(
+        "Failed to load departments. You can still submit the report.",
+        "Department Data"
+      );
     } finally {
-      setLoadingDepartments(false);
+      setLoadingStates((prev) => ({ ...prev, departments: false }));
     }
   };
 
+  // Handle location changes with cascading updates
+  const handleCountyChange = (countyId) => {
+    setFormData((prev) => ({
+      ...prev,
+      county: countyId,
+      subcounty: "",
+      ward: "",
+    }));
+
+    if (countyId) {
+      fetchSubCounties(countyId);
+      setLocationData((prev) => ({ ...prev, subCounties: [], wards: [] }));
+    } else {
+      setLocationData((prev) => ({ ...prev, subCounties: [], wards: [] }));
+    }
+  };
+
+  const handleSubCountyChange = (subCountyId) => {
+    setFormData((prev) => ({
+      ...prev,
+      subcounty: subCountyId,
+      ward: "",
+    }));
+
+    if (subCountyId) {
+      fetchWards(subCountyId);
+      setLocationData((prev) => ({ ...prev, wards: [] }));
+    } else {
+      setLocationData((prev) => ({ ...prev, wards: [] }));
+    }
+  };
+
+  // AI Analysis with intelligent suggestions
   const handleAnalysisUpdate = useCallback(
     async (title, description) => {
-      if (!title || !description) return;
+      if (
+        !title?.trim() ||
+        !description?.trim() ||
+        title.length < 5 ||
+        description.length < 10
+      ) {
+        return null;
+      }
 
       try {
         const analysis = await analyzeReport(title, description);
         if (analysis) {
           setAiAnalysis(analysis);
 
-          // Auto-fill department if high confidence
-          if (analysis.confidence >= 0.8 && analysis.predicted_department) {
-            const matchedDept = departments.find(
-              (dept) => dept.name === analysis.predicted_department
+          // Auto-suggest department with high confidence
+          if (analysis.confidence >= 0.7 && analysis.predicted_department) {
+            const matchedDept = locationData.departments.find(
+              (dept) =>
+                dept.name.toLowerCase() ===
+                analysis.predicted_department.toLowerCase()
             );
-            if (matchedDept) {
+            if (matchedDept && !formData.department) {
               setFormData((prev) => ({ ...prev, department: matchedDept.id }));
-              showInfo(`AI suggested department: ${analysis.predicted_department}`, 'AI Suggestion');
+              showInfo(
+                `AI suggested department: ${analysis.predicted_department}`,
+                "AI Suggestion"
+              );
             }
           }
         }
         return analysis;
       } catch (error) {
         console.error("AI analysis failed:", error);
-        showWarning('AI analysis is temporarily unavailable. Please select department manually.', 'AI Service');
+        showWarning(
+          "AI analysis is temporarily unavailable. Please select department manually.",
+          "AI Service"
+        );
         return null;
       }
     },
-    [analyzeReport, departments, showInfo, showWarning]
+    [
+      analyzeReport,
+      locationData.departments,
+      formData.department,
+      showInfo,
+      showWarning,
+    ]
   );
 
-  // Form validation
-  const validateForm = () => {
+  // Enhanced form validation
+  const validateForm = useCallback(() => {
     const errors = {};
 
-    if (!formData.title?.trim()) errors.title = "Title is required";
-    if (!formData.description?.trim())
-      errors.description = "Description is required";
-    if (!formData.county) errors.county = "County is required";
-
-    // Validate description length
-    if (formData.description?.trim().length < 10) {
-      errors.description = "Description should be at least 10 characters long";
+    // Title validation
+    if (!formData.title?.trim()) {
+      errors.title = "Title is required";
+    } else if (formData.title.trim().length < 5) {
+      errors.title = "Title must be at least 5 characters long";
+    } else if (formData.title.trim().length > 200) {
+      errors.title = "Title must be less than 200 characters";
     }
 
-    // Validate title length
-    if (formData.title?.trim().length < 5) {
-      errors.title = "Title should be at least 5 characters long";
+    // Description validation
+    if (!formData.description?.trim()) {
+      errors.description = "Description is required";
+    } else if (formData.description.trim().length < 10) {
+      errors.description = "Description must be at least 10 characters long";
+    } else if (formData.description.trim().length > 2000) {
+      errors.description = "Description must be less than 2000 characters";
+    }
+
+    // Location validation
+    if (!formData.county) {
+      errors.county = "Please select a county";
+    }
+
+    // Image validation (optional but with limits)
+    if (formData.images.length > 10) {
+      errors.images = "Maximum 10 images allowed";
     }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  };
+  }, [formData]);
 
-  // Form reset
-  const resetForm = () => {
+  // Form reset with cleanup
+  const resetForm = useCallback(() => {
     setFormData({
       title: "",
       description: "",
@@ -204,30 +265,28 @@ const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => 
       longitude: "",
       images: [],
       priority: "medium",
+      is_anonymous: false,
+      anonymous_display_name: "Anonymous Citizen",
     });
     setAiAnalysis(null);
     setValidationErrors({});
     clearError();
-  };
+  }, [clearError]);
 
-  // Form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     clearError();
     setValidationErrors({});
 
     if (!validateForm()) {
-      // Scroll to first error
-      const firstErrorField = Object.keys(validationErrors)[0];
-      const element = document.querySelector(`[name="${firstErrorField}"]`);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-      showError('Please fix the validation errors before submitting.', 'Validation Error');
+      // ... validation error handling
       return;
     }
 
-    // Prepare data for backend
+    // FIX: Create a proper copy of the images array
+    const imagesToSubmit = [...formData.images]; // Create actual copy
+
+    // Prepare submission data with the stored images
     const submitData = {
       title: formData.title.trim(),
       description: formData.description.trim(),
@@ -238,8 +297,20 @@ const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => 
       latitude: formData.latitude || null,
       longitude: formData.longitude || null,
       priority: formData.priority,
-      new_images: formData.images || [],
+      is_anonymous: formData.is_anonymous,
+      anonymous_display_name: formData.anonymous_display_name,
+      images: imagesToSubmit, // Use the copied images
     };
+
+    console.log("🚀 Submitting with images:", {
+      count: imagesToSubmit.length,
+      images: imagesToSubmit.map((img) => ({
+        name: img.name,
+        size: img.size,
+        type: img.type,
+        isFile: img instanceof File,
+      })),
+    });
 
     try {
       onSubmissionStart();
@@ -249,41 +320,69 @@ const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => 
         resetForm();
         onSubmissionComplete(true, result.reportId);
       } else {
-        onSubmissionComplete(false, null, error || "Failed to submit report");
+        onSubmissionComplete(
+          false,
+          null,
+          result.error || "Failed to submit report"
+        );
       }
     } catch (submitError) {
       console.error("Submission failed:", submitError);
-      onSubmissionComplete(false, null, submitError.message || "Submission failed");
+      onSubmissionComplete(false, null, submitError.message);
     }
   };
 
-  // Handle form cancellation
+  // Enhanced cancellation with confirmation
   const handleCancel = () => {
-    showWarning(
-      "Are you sure you want to cancel? Any unsaved changes will be lost.",
-      "Confirm Cancellation",
-      10000,
-      () => {
-        resetForm();
-        navigate("/dashboard");
-      }
-    );
+    const hasUnsavedChanges =
+      formData.title || formData.description || formData.images.length > 0;
+
+    if (hasUnsavedChanges) {
+      showWarning(
+        "You have unsaved changes. Are you sure you want to cancel?",
+        "Confirm Cancellation",
+        10000,
+        () => {
+          resetForm();
+          navigate("/dashboard");
+        }
+      );
+    } else {
+      navigate("/dashboard");
+    }
   };
 
-  // Authentication check
+  // Authentication guard
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="bg-red-100 border border-red-300 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-8 h-8 text-red-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">
             Authentication Required
           </h2>
-          <p className="text-gray-600 mb-4">
-            Please log in to create a report.
+          <p className="text-gray-600 mb-6">
+            Please log in to create a community report.
           </p>
           <button
-            onClick={() => navigate("/login")}
-            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+            onClick={() =>
+              navigate("/login", { state: { from: "/reports/create" } })
+            }
+            className="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors w-full"
           >
             Go to Login
           </button>
@@ -294,84 +393,50 @@ const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => 
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-          <div className="bg-green-600 px-6 py-4">
-            <h1 className="text-2xl font-bold text-white">
-              Report a Community Issue
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+        {/* Header Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+          <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-5">
+            <h1 className="text-2xl lg:text-3xl font-bold text-white mb-2">
+              Report Community Issue
             </h1>
-            <p className="text-green-100">
+            <p className="text-green-100 text-lg">
               Help improve your community by reporting issues that need
               attention
             </p>
           </div>
 
-          <div className="p-6 border-b">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <p className="text-sm text-gray-600">
-                  Reporting as:{" "}
-                  <strong>
-                    {user.first_name} {user.last_name}
-                  </strong>
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="space-y-2">
+                <p className="text-sm text-gray-700">
+                  <span className="font-medium">Reporting as:</span>{" "}
+                  {user.first_name} {user.last_name}
                 </p>
-                <p className="text-sm text-gray-600">
-                  Role: <span className="capitalize">{user.role}</span>
+                <p className="text-sm text-gray-600 capitalize">
+                  <span className="font-medium">Role:</span>{" "}
+                  {user.role?.replace(/_/g, " ")}
+                  {user.county && ` • ${user.county.name || user.county}`}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-600">All reports are public</p>
-                <p className="text-sm text-gray-600">
-                  AI-powered department assignment
-                </p>
+              <div className="flex flex-wrap gap-3 text-sm">
+                <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">
+                  AI-Powered Analysis
+                </span>
+                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">
+                  Public Report
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Fetch Error Display */}
-        {validationErrors.fetchError && (
-          <div
-            role="alert"
-            aria-live="polite"
-            className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg mb-6"
-          >
-            <div className="flex items-center">
-              <svg
-                className="w-5 h-5 mr-2"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              {validationErrors.fetchError}
-            </div>
-          </div>
-        )}
-
-        {/* AI Feedback */}
-        {aiAnalysis && (
-          <AIFeedback
-            aiAnalysis={aiAnalysis}
-            confidenceLevel={aiAnalysis.confidence}
-          />
-        )}
-
-        {/* Error Display */}
+        {/* Error Displays */}
         {error && (
-          <div
-            role="alert"
-            aria-live="polite"
-            className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6"
-          >
-            <div className="flex items-center">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 animate-fade-in">
+            <div className="flex items-start space-x-3">
               <svg
-                className="w-5 h-5 mr-2"
+                className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -381,9 +446,21 @@ const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => 
                   clipRule="evenodd"
                 />
               </svg>
-              {error}
+              <div>
+                <p className="font-medium text-red-800">Submission Error</p>
+                <p className="text-red-700 mt-1">{error}</p>
+              </div>
             </div>
           </div>
+        )}
+
+        {/* AI Feedback */}
+        {aiAnalysis && (
+          <AIFeedback
+            aiAnalysis={aiAnalysis}
+            confidenceLevel={aiAnalysis.confidence}
+            onDismiss={() => setAiAnalysis(null)}
+          />
         )}
 
         {/* Main Form */}
@@ -392,22 +469,22 @@ const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => 
             formData={formData}
             setFormData={setFormData}
             onAnalysisUpdate={handleAnalysisUpdate}
-            departments={departments}
-            loadingDepartments={loadingDepartments}
+            departments={locationData.departments}
+            loadingDepartments={loadingStates.departments}
             validationErrors={validationErrors}
           />
 
           <LocationSection
             formData={formData}
             setFormData={setFormData}
-            counties={counties}
-            subCounties={subCounties}
-            setSubCounties={setSubCounties}
-            wards={wards}
-            setWards={setWards}
-            loadingCounties={loadingCounties}
-            loadingSubCounties={loadingSubCounties}
-            loadingWards={loadingWards}
+            counties={locationData.counties}
+            subCounties={locationData.subCounties}
+            wards={locationData.wards}
+            onCountyChange={handleCountyChange}
+            onSubCountyChange={handleSubCountyChange}
+            loadingCounties={loadingStates.counties}
+            loadingSubCounties={loadingStates.subCounties}
+            loadingWards={loadingStates.wards}
             validationErrors={validationErrors}
           />
 
@@ -417,16 +494,16 @@ const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => 
             validationErrors={validationErrors}
           />
 
-          {/* Submit Section */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Ready to Submit
+          {/* Submission Section */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Ready to Submit Report
                 </h3>
                 <p className="text-sm text-gray-600">
-                  Your report will be public and assigned to the appropriate
-                  department
+                  Your report will be publicly visible and automatically
+                  assigned to the appropriate county department for action.
                 </p>
               </div>
 
@@ -434,14 +511,14 @@ const CreateReportForm = ({ onSubmissionStart, onSubmissionComplete, user }) => 
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 min-w-[140px]"
                 >
                   {loading ? (
                     <>

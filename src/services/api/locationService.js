@@ -2,115 +2,174 @@
 import api from './api';
 
 class LocationService {
+  /**
+   * Get counties from /api/location/counties
+   */
   async getCounties() {
     try {
-      console.log('Fetching all counties...');
-      const response = await api.get('/location/counties/', {
-        params: {
-          limit: 100,
-          page_size: 100,
-          ordering: 'name'
-        }
-      });
-      
-      console.log('Counties API Response:', response.data);
-      
-      let counties = [];
-      if (response.data && response.data.results) {
-        counties = response.data.results;
-      } else if (Array.isArray(response.data)) {
-        counties = response.data;
-      } else if (response.data && Array.isArray(response.data.data)) {
-        counties = response.data.data;
-      }
-      
-      console.log('Loaded counties:', counties.length);
-      return counties;
-    } catch (error) {
-      console.error('Error fetching counties:', error.response?.data || error.message);
-      throw error;
-    }
-  }
-
-  // ADD THIS METHOD - getAllCounties for paginated fetching
-  async getAllCounties() {
-    try {
-      console.log('Fetching all counties with pagination...');
       let allCounties = [];
       let nextUrl = '/location/counties/';
+      let page = 1;
       
-      while (nextUrl) {
+      while (nextUrl && page <= 10) {
         const response = await api.get(nextUrl);
         const data = response.data;
         
-        if (data.results) {
-          allCounties = [...allCounties, ...data.results];
+        let pageCounties = [];
+        
+        if (data.results && Array.isArray(data.results)) {
+          pageCounties = data.results;
           nextUrl = data.next;
         } else if (Array.isArray(data)) {
-          allCounties = [...allCounties, ...data];
+          pageCounties = data;
           nextUrl = null;
         } else if (data.data && Array.isArray(data.data)) {
-          allCounties = [...allCounties, ...data.data];
+          pageCounties = data.data;
           nextUrl = data.next;
         } else {
           nextUrl = null;
         }
+        
+        allCounties = [...allCounties, ...pageCounties];
+        
+        if (allCounties.length >= 47 || !nextUrl) {
+          break;
+        }
+        
+        page++;
       }
       
-      console.log('Total counties loaded:', allCounties.length);
+      console.log(`Total counties loaded: ${allCounties.length}`);
       return allCounties;
     } catch (error) {
-      console.error('Error fetching all counties:', error.response?.data || error.message);
+      console.error('Error fetching all counties:', error.message);
+      throw error;
+    }
+  }
+  /**
+   * Get ALL counties with pagination
+   */
+  async getAllCounties() {
+    try {
+      let allCounties = [];
+      let nextUrl = '/location/counties/';
+      let page = 1;
+      
+      while (nextUrl && page <= 10) {
+        const response = await api.get(nextUrl);
+        const data = response.data;
+        
+        let pageCounties = [];
+        
+        if (data.results && Array.isArray(data.results)) {
+          pageCounties = data.results;
+          nextUrl = data.next;
+        } else if (Array.isArray(data)) {
+          pageCounties = data;
+          nextUrl = null;
+        } else if (data.data && Array.isArray(data.data)) {
+          pageCounties = data.data;
+          nextUrl = data.next;
+        } else {
+          nextUrl = null;
+        }
+        
+        allCounties = [...allCounties, ...pageCounties];
+        
+        if (allCounties.length >= 47 || !nextUrl) {
+          break;
+        }
+        
+        page++;
+      }
+      
+      console.log(`Total counties loaded: ${allCounties.length}`);
+      return allCounties;
+    } catch (error) {
+      console.error('Error fetching all counties:', error.message);
       throw error;
     }
   }
 
   async getSubcounties(countyId) {
     try {
-      const response = await api.get(`/location/subcounties/?county=${countyId}`);
-      return response.data.results || response.data || [];
+      if (!countyId) {
+        return [];
+      }
+      
+      const response = await api.get('/location/subcounties/', {
+        params: {
+          county: countyId,
+          limit: 100
+        }
+      });
+      
+      let subcounties = [];
+      
+      if (response.data && response.data.results) {
+        subcounties = response.data.results;
+      } else if (Array.isArray(response.data)) {
+        subcounties = response.data;
+      } else if (response.data && Array.isArray(response.data.data)) {
+        subcounties = response.data.data;
+      }
+      
+      console.log(`Loaded ${subcounties.length} subcounties for county ${countyId}`);
+      return subcounties;
     } catch (error) {
-      console.error(`Error fetching subcounties for county ${countyId}:`, error.response?.data || error.message);
-      throw error;
+      console.error(`Error fetching subcounties for county ${countyId}:`, error.message);
+      return [];
     }
   }
 
   async getWards(subcountyId) {
     try {
-      const response = await api.get(`/location/wards/?subcounty=${subcountyId}`);
-      return response.data.results || response.data || [];
+      if (!subcountyId) {
+        return [];
+      }
+      
+      const response = await api.get('/location/wards/', {
+        params: {
+          subcounty: subcountyId,
+          limit: 100
+        }
+      });
+      
+      let wards = [];
+      
+      if (response.data && response.data.results) {
+        wards = response.data.results;
+      } else if (Array.isArray(response.data)) {
+        wards = response.data;
+      } else if (response.data && Array.isArray(response.data.data)) {
+        wards = response.data.data;
+      }
+      
+      console.log(`Loaded ${wards.length} wards for subcounty ${subcountyId}`);
+      return wards;
     } catch (error) {
-      console.error(`Error fetching wards for subcounty ${subcountyId}:`, error.response?.data || error.message);
-      throw error;
+      console.error(`Error fetching wards for subcounty ${subcountyId}:`, error.message);
+      return [];
     }
   }
 
   async getDepartments() {
     try {
       const response = await api.get('/department/departments/');
-      return response.data.results || response.data || [];
+      const data = response.data;
+      
+      let departments = [];
+      if (data && data.results) {
+        departments = data.results;
+      } else if (Array.isArray(data)) {
+        departments = data;
+      } else if (data && Array.isArray(data.data)) {
+        departments = data.data;
+      }
+      
+      return departments;
     } catch (error) {
-      console.error('Error fetching departments:', error.response?.data || error.message);
-      throw error;
-    }
-  }
-
-  async getCountyDepartments() {
-    try {
-      const response = await api.get('/department/county-departments/');
-      return response.data.results || response.data || [];
-    } catch (error) {
-      console.error('Error fetching county departments:', error.response?.data || error.message);
-      throw error;
-    }
-  }
-
-  async getCountyDepartmentsByCounty(countyId) {
-    try {
-      const response = await api.get(`/department/county-departments/?county=${countyId}`);
-      return response.data.results || response.data || [];
-    } catch (error) {
-      console.error(`Error fetching county departments for county ${countyId}:`, error.response?.data || error.message);
+      console.error('Error fetching departments:', error.message);
       throw error;
     }
   }
@@ -123,7 +182,7 @@ class LocationService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error reverse geocoding:', error.response?.data || error.message);
+      console.error('Error reverse geocoding:', error.message);
       throw error;
     }
   }

@@ -1,183 +1,408 @@
-// components/reports/ReportCard/index.jsx (UPDATED)
-import React from 'react';
+// components/reports/ReportCard/index.jsx - PROFESSIONAL VERSION
+import React, { useState, useCallback } from 'react';
 
-const ReportCard = ({ report, onCardClick, showComments = false, onCommentClick }) => {
-  const getStatusColor = (status) => {
-    const colors = {
-      submitted: 'bg-blue-100 text-blue-800 border-blue-200',
-      verified: 'bg-green-100 text-green-800 border-green-200',
-      pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      noted: 'bg-purple-100 text-purple-800 border-purple-200',
-      on_progress: 'bg-orange-100 text-orange-800 border-orange-200',
-      resolved: 'bg-green-100 text-green-800 border-green-200',
-      rejected: 'bg-red-100 text-red-800 border-red-200',
-      deleted: 'bg-gray-100 text-gray-800 border-gray-200'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+const ReportCard = ({ 
+  report, 
+  onCardClick, 
+  onLike, 
+  onComment, 
+  currentUser,
+  showEngagement = true,
+  compact = false
+}) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Professional status configuration
+  const statusConfig = {
+    submitted: { 
+      color: 'bg-blue-50 text-blue-700 border-blue-200', 
+      text: 'Submitted'
+    },
+    verified: { 
+      color: 'bg-green-50 text-green-700 border-green-200', 
+      text: 'Verified'
+    },
+    pending: { 
+      color: 'bg-yellow-50 text-yellow-700 border-yellow-200', 
+      text: 'Pending Review'
+    },
+    noted: { 
+      color: 'bg-purple-50 text-purple-700 border-purple-200', 
+      text: 'Noted'
+    },
+    on_progress: { 
+      color: 'bg-orange-50 text-orange-700 border-orange-200', 
+      text: 'In Progress'
+    },
+    resolved: { 
+      color: 'bg-emerald-50 text-emerald-700 border-emerald-200', 
+      text: 'Resolved'
+    },
+    rejected: { 
+      color: 'bg-red-50 text-red-700 border-red-200', 
+      text: 'Rejected'
+    }
   };
 
-  const getStatusDisplay = (status) => {
-    const displays = {
-      submitted: 'Submitted',
-      verified: 'Verified',
-      pending: 'Pending',
-      noted: 'Noted',
-      on_progress: 'In Progress',
-      resolved: 'Resolved',
-      rejected: 'Rejected',
-      deleted: 'Deleted'
-    };
-    return displays[status] || status;
-  };
+  const getReporterDisplay = useCallback(() => {
+    if (report.is_anonymous) {
+      return report.anonymous_display_name || 'Anonymous Citizen';
+    }
+    return report.reporter_name || report.reporter?.display_name || 'User';
+  }, [report]);
 
-  const getDepartmentIcon = (departmentName) => {
-    if (!departmentName) return null;
-    
-    const icons = {
-      'health': 'Health',
-      'education': 'Education',
-      'roads': 'Roads',
-      'security': 'Security',
-      'agriculture': 'Agriculture',
-      'environment': 'Environment',
-      'water': 'Water',
-      'finance': 'Finance',
-      'housing': 'Housing',
-      'ict': 'ICT',
-      'transport': 'Transport',
-      'trade': 'Trade'
-    };
+  const getImageUrl = useCallback(() => {
+    const sources = [
+      report.main_image_url,
+      report.thumbnail_url,
+      report.image_url,
+    ];
 
-    const deptLower = departmentName.toLowerCase();
-    for (const [key, displayName] of Object.entries(icons)) {
-      if (deptLower.includes(key)) {
-        return displayName;
+    for (const source of sources) {
+      if (source && typeof source === 'string' && source.trim()) {
+        return source;
       }
     }
+
+    if (report.images && report.images.length > 0) {
+      const firstImage = report.images[0];
+      const imageSources = [
+        firstImage?.image_url,
+        firstImage?.thumbnail_url,
+      ];
+
+      for (const source of imageSources) {
+        if (source && typeof source === 'string' && source.trim()) {
+          return source;
+        }
+      }
+    }
+
+    return null;
+  }, [report]);
+
+  const hasImages = Boolean(
+    report.main_image_url ||
+    report.thumbnail_url ||
+    report.image_url ||
+    (report.images && report.images.length > 0) ||
+    report.has_images ||
+    (report.image_count && report.image_count > 0)
+  );
+
+  const imageUrl = getImageUrl();
+  const imageCount = report.image_count || (report.images ? report.images.length : 0);
+
+  const formatRelativeTime = useCallback((dateString) => {
+    if (!dateString) return '';
     
-    return departmentName;
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now - date) / 1000);
+      
+      if (diffInSeconds < 60) return 'Just now';
+      if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+      if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+      if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+      
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
+    } catch (error) {
+      return '';
+    }
+  }, []);
+
+  const handleLike = useCallback((e) => {
+    e.stopPropagation();
+    if (onLike && report.id) {
+      onLike(report.id);
+    }
+  }, [onLike, report.id]);
+
+  const handleComment = useCallback((e) => {
+    e.stopPropagation();
+    if (onComment && report.id) {
+      onComment(report.id);
+    }
+  }, [onComment, report.id]);
+
+  const handleCardClick = useCallback(() => {
+    if (onCardClick && report.id) {
+      onCardClick(report.id);
+    }
+  }, [onCardClick, report.id]);
+
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+    setImageLoaded(false);
+  }, []);
+
+  const handleImageLoad = useCallback(() => {
+    setImageLoaded(true);
+    setImageError(false);
+  }, []);
+
+  const statusInfo = statusConfig[report.status] || { 
+    color: 'bg-gray-50 text-gray-700 border-gray-200', 
+    text: report.status || 'Unknown'
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-KE', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+  const reporterDisplay = getReporterDisplay();
+  const isOfficialReport = report.is_development_showcase;
 
-  const truncateText = (text, maxLength) => {
-    if (!text) return '';
-    if (text.length <= maxLength) return text;
-    return text.substr(0, maxLength) + '...';
-  };
-
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      {/* Header with Image */}
-      {report.images && report.images.length > 0 ? (
-        <div className="h-48 overflow-hidden">
-          <img
-            src={report.images[0].image}
-            alt={report.title}
-            className="w-full h-full object-cover cursor-pointer"
-            onClick={onCardClick}
-          />
-        </div>
-      ) : (
-        <div 
-          className="h-32 bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center cursor-pointer"
-          onClick={onCardClick}
-        >
-          <div className="text-green-600 font-semibold text-lg">
-            {getDepartmentIcon(report.department_name) || 'Report'}
+  if (compact) {
+    return (
+      <div 
+        className="bg-white border border-gray-200 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer"
+        onClick={handleCardClick}
+      >
+        <div className="p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center space-x-2 flex-1 min-w-0">
+              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-medium text-xs flex-shrink-0">
+                {reporterDisplay.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-gray-900 text-sm truncate">
+                  {reporterDisplay}
+                </p>
+                <p className="text-gray-500 text-xs">
+                  {formatRelativeTime(report.created_at)}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col items-end space-y-1">
+              {isOfficialReport && (
+                <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-medium border border-blue-200">
+                  Official
+                </span>
+              )}
+              <span className={`px-2 py-1 rounded text-xs font-medium border ${statusInfo.color}`}>
+                {statusInfo.text}
+              </span>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Content */}
-      <div className="p-4">
-        {/* Status and Date */}
-        <div className="flex justify-between items-start mb-3">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(report.status)}`}>
-            {getStatusDisplay(report.status)}
-          </span>
-          <span className="text-xs text-gray-500">
-            {formatDate(report.created_at)}
-          </span>
-        </div>
+          <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2 text-sm">
+            {report.title}
+          </h3>
+          <p className="text-gray-600 text-sm line-clamp-2 mb-2">
+            {report.description}
+          </p>
 
-        {/* Title */}
-        <h3 
-          className="font-semibold text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-green-700"
-          onClick={onCardClick}
-        >
-          {report.title}
-        </h3>
-
-        {/* Description */}
-        <p className="text-sm text-gray-600 mb-4 line-clamp-3">
-          {truncateText(report.description, 120)}
-        </p>
-
-        {/* Location and Department */}
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center text-xs text-gray-500">
-            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            {report.county_name}
-            {report.subcounty_name && `, ${report.subcounty_name}`}
+          <div className="flex items-center text-gray-500 text-xs mb-2">
+            <span className="mr-3">{report.county_name || report.county?.name || 'Location not specified'}</span>
+            {report.department_name && (
+              <span>{report.department_name}</span>
+            )}
           </div>
 
-          {report.department_name && (
-            <div className="flex items-center text-xs text-gray-500">
-              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              {getDepartmentIcon(report.department_name)}
+          {showEngagement && (
+            <div className="flex items-center justify-between text-gray-500 text-xs">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={handleComment}
+                  className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
+                >
+                  <span>Comments</span>
+                  <span>({report.comments_count || 0})</span>
+                </button>
+                <button
+                  onClick={handleLike}
+                  className={`flex items-center space-x-1 transition-colors ${
+                    report.current_user_liked ? 'text-red-600' : 'hover:text-red-600'
+                  }`}
+                >
+                  <span>Likes</span>
+                  <span>({report.likes_count || 0})</span>
+                </button>
+                <div className="flex items-center space-x-1">
+                  <span>Views</span>
+                  <span>({report.views_count || 0})</span>
+                </div>
+              </div>
+              {hasImages && (
+                <div className="text-gray-400">
+                  {imageCount} image{imageCount !== 1 ? 's' : ''}
+                </div>
+              )}
             </div>
           )}
         </div>
+      </div>
+    );
+  }
 
-        {/* Footer */}
-        <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-          <div className="flex items-center text-xs text-gray-500">
-            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            {report.reporter_name || 'Anonymous'}
+  return (
+    <div 
+      className={`bg-white border-b border-gray-200 transition-colors duration-200 cursor-pointer group ${
+        isOfficialReport ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'hover:bg-gray-50'
+      }`}
+      onClick={handleCardClick}
+    >
+      <div className="flex p-4 space-x-4">
+        <div className="flex-shrink-0">
+          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-medium text-sm">
+            {reporterDisplay.charAt(0).toUpperCase()}
           </div>
+        </div>
 
-          <div className="flex items-center space-x-4">
-            {/* AI Verification Badge */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="font-semibold text-gray-900 text-sm">
+              {reporterDisplay}
+            </span>
+            <span className="text-gray-400 text-sm">•</span>
+            <span className="text-gray-500 text-sm">
+              {formatRelativeTime(report.created_at)}
+            </span>
+            
+            {isOfficialReport && (
+              <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-200">
+                Official Government Project
+              </span>
+            )}
+            
+            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${statusInfo.color}`}>
+              {statusInfo.text}
+            </span>
+
             {report.verified_by_ai && (
-              <div className="flex items-center text-xs bg-green-50 text-green-700 px-2 py-1 rounded">
-                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
+              <span className="bg-green-50 text-green-700 px-2 py-1 rounded-full text-xs font-medium border border-green-200">
                 AI Verified
-              </div>
+              </span>
             )}
 
-            {/* Comments Button */}
-            {showComments && (
-              <button
-                onClick={onCommentClick}
-                className="flex items-center text-xs text-gray-500 hover:text-green-600"
-              >
-                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                Comment
-              </button>
+            {report.is_anonymous && (
+              <span className="bg-gray-50 text-gray-600 px-2 py-1 rounded-full text-xs font-medium border border-gray-200">
+                Anonymous
+              </span>
             )}
           </div>
+
+          <div className="flex flex-wrap items-center gap-3 text-gray-600 text-sm mb-3">
+            <span className="font-medium">
+              {report.county_name || report.county?.name || 'Location not specified'}
+            </span>
+            {report.subcounty_name && (
+              <span className="text-gray-500">• {report.subcounty_name}</span>
+            )}
+            
+            {report.department_name && (
+              <span className="font-medium">{report.department_name}</span>
+            )}
+          </div>
+
+          <div className="mb-4">
+            <h3 className="text-gray-900 font-bold text-lg mb-2 leading-tight group-hover:text-green-700 transition-colors">
+              {report.title}
+            </h3>
+            <p className="text-gray-700 text-sm leading-relaxed line-clamp-3">
+              {report.description}
+            </p>
+          </div>
+
+          {hasImages && imageUrl && !imageError ? (
+            <div className="mb-4 rounded-lg overflow-hidden border border-gray-200 max-w-md">
+              <div className="relative">
+                <img
+                  src={imageUrl}
+                  alt={`Evidence for ${report.title}`}
+                  className={`w-full h-64 object-cover transition-all duration-300 ${
+                    imageLoaded ? 'group-hover:brightness-105' : 'blur-sm'
+                  }`}
+                  onError={handleImageError}
+                  onLoad={handleImageLoad}
+                />
+                {!imageLoaded && !imageError && (
+                  <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+                    <div className="text-center text-gray-400">
+                      <div className="text-sm mb-1">Loading image</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {imageCount > 1 && (
+                <div className="absolute top-3 right-3 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs font-medium">
+                  +{imageCount - 1} more
+                </div>
+              )}
+            </div>
+          ) : hasImages && (imageError || !imageUrl) ? (
+            <div className="mb-4 rounded-lg border border-gray-200 max-w-md">
+              <div className="w-full h-64 bg-gray-100 flex items-center justify-center">
+                <div className="text-center text-gray-400">
+                  <div className="text-sm font-medium">Image not available</div>
+                  <div className="text-xs mt-1">Click to view report details</div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {showEngagement && (
+            <div className="flex items-center justify-between max-w-md">
+              <div className="flex items-center space-x-6 text-gray-500">
+                <button
+                  onClick={handleComment}
+                  className="flex items-center space-x-2 hover:text-blue-600 transition-colors"
+                >
+                  <div className="p-2 rounded-full hover:bg-blue-50 transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium text-sm">{report.comments_count || 0}</span>
+                </button>
+
+                <button
+                  onClick={handleLike}
+                  className={`flex items-center space-x-2 transition-colors ${
+                    report.current_user_liked ? 'text-red-600' : 'hover:text-red-600'
+                  }`}
+                >
+                  <div className={`p-2 rounded-full transition-colors ${
+                    report.current_user_liked ? 'bg-red-50' : 'hover:bg-red-50'
+                  }`}>
+                    <svg 
+                      className="w-5 h-5" 
+                      fill={report.current_user_liked ? "currentColor" : "none"} 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium text-sm">{report.likes_count || 0}</span>
+                </button>
+
+                <div className="flex items-center space-x-2">
+                  <div className="p-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium text-sm">{report.views_count || 0}</span>
+                </div>
+              </div>
+
+              {hasImages && imageCount > 1 && (
+                <div className="text-gray-400 text-sm">
+                  {imageCount} images
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default ReportCard;
+export default React.memo(ReportCard);

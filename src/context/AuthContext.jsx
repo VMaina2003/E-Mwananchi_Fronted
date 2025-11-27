@@ -1,39 +1,46 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { authAPI } from '../services/api/auth';
+import React, { createContext, useState, useContext, useEffect, useCallback } from "react";
+import { authAPI } from "../services/api/auth";
 
 const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [operationLoading, setOperationLoading] = useState({
+    login: false,
+    google: false,
+    apple: false,
+    register: false,
+    logout: false
+  });
 
   // Helper function to add role properties to user object
-  const enhanceUserWithRoleProperties = (userData) => {
+  const enhanceUserWithRoleProperties = useCallback((userData) => {
     if (!userData) return null;
-    
+
     return {
       ...userData,
       // Add role-based boolean properties for easy checking
-      is_citizen: userData.role === 'citizen',
-      is_county_official: userData.role === 'county_official',
-      is_admin: userData.role === 'admin',
-      is_superadmin: userData.role === 'superadmin',
-      is_viewer: userData.role === 'viewer',
-      
+      is_citizen: userData.role === "citizen",
+      is_county_official: userData.role === "county_official",
+      is_admin: userData.role === "admin",
+      is_superadmin: userData.role === "superadmin",
+      is_viewer: userData.role === "viewer",
+
       // Add convenience methods for role checking
       hasRole: (role) => userData.role === role,
       hasAnyRole: (roles) => roles.includes(userData.role),
     };
-  };
+  }, []);
 
   // Check if user is logged in on app start
   useEffect(() => {
@@ -42,148 +49,173 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const storedUser = localStorage.getItem('user');
+      const token = localStorage.getItem("access_token");
+      const storedUser = localStorage.getItem("user");
 
       if (token && storedUser) {
         try {
           const userData = await authAPI.getCurrentUser();
           const enhancedUser = enhanceUserWithRoleProperties(userData);
           setUser(enhancedUser);
-          localStorage.setItem('user', JSON.stringify(enhancedUser));
+          localStorage.setItem("user", JSON.stringify(enhancedUser));
         } catch (error) {
-          console.log('Token invalid, logging out:', error);
-          logout();
+          console.log("Token invalid, logging out:", error);
+          await logout();
         }
       }
     } catch (error) {
-      console.log('Auth check failed:', error);
-      logout();
+      console.log("Auth check failed:", error);
+      await logout();
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   };
 
-  const handleAuthSuccess = (response) => {
+  const handleAuthSuccess = useCallback((response) => {
     if (response.access && response.refresh) {
-      localStorage.setItem('access_token', response.access);
-      localStorage.setItem('refresh_token', response.refresh);
-      
+      localStorage.setItem("access_token", response.access);
+      localStorage.setItem("refresh_token", response.refresh);
+
       if (response.user) {
         const enhancedUser = enhanceUserWithRoleProperties(response.user);
         setUser(enhancedUser);
-        localStorage.setItem('user', JSON.stringify(enhancedUser));
+        localStorage.setItem("user", JSON.stringify(enhancedUser));
       } else {
-        console.error('No user data in auth response');
-        throw new Error('Authentication failed: No user data received');
+        console.error("No user data in auth response");
+        throw new Error("Authentication failed: No user data received");
       }
     } else {
-      throw new Error('Authentication failed: No tokens received');
+      throw new Error("Authentication failed: No tokens received");
     }
-  };
+  }, [enhanceUserWithRoleProperties]);
 
   const loginWithGoogle = async (credentialResponse) => {
     try {
-      setError('');
-      setLoading(true);
-      
+      setError("");
+      setOperationLoading(prev => ({ ...prev, google: true }));
+
+      if (!credentialResponse?.credential) {
+        throw new Error("No Google credential received");
+      }
+
       const response = await authAPI.googleAuth({
-        token: credentialResponse.credential
+        token: credentialResponse.credential // Changed from 'credential' to 'token'
       });
-      
+
       handleAuthSuccess(response);
       return { success: true, data: response };
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || error.message || 'Google login failed. Please try again.';
+      console.error("Google login error:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+
+      const errorMessage = error.response?.data?.detail 
+        || error.message 
+        || "Google login failed. Please try again.";
+
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
-      setLoading(false);
+      setOperationLoading(prev => ({ ...prev, google: false }));
     }
   };
 
   const loginWithApple = async (response) => {
     try {
-      setError('');
-      setLoading(true);
-      
+      setError("");
+      setOperationLoading(prev => ({ ...prev, apple: true }));
+
       if (!response.authorization?.id_token) {
-        throw new Error('Invalid Apple login response');
+        throw new Error("Invalid Apple login response");
       }
 
       const authResponse = await authAPI.appleAuth({
         id_token: response.authorization.id_token,
-        user: response.user || {}
+        user: response.user || {},
       });
-      
+
       handleAuthSuccess(authResponse);
       return { success: true, data: authResponse };
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || error.message || 'Apple login failed. Please try again.';
+      const errorMessage = error.response?.data?.detail 
+        || error.message 
+        || "Apple login failed. Please try again.";
+      
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
-      setLoading(false);
+      setOperationLoading(prev => ({ ...prev, apple: false }));
     }
   };
 
   const login = async (email, password) => {
     try {
-      setError('');
-      setLoading(true);
-      
+      setError("");
+      setOperationLoading(prev => ({ ...prev, login: true }));
+
       const response = await authAPI.login({ email, password });
       handleAuthSuccess(response);
-      
+
       return { success: true, data: response };
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || 'Login failed. Please check your credentials.';
+      const errorMessage = error.response?.data?.detail 
+        || "Login failed. Please check your credentials.";
+      
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
-      setLoading(false);
+      setOperationLoading(prev => ({ ...prev, login: false }));
     }
   };
 
   const register = async (userData) => {
     try {
-      setError('');
-      setLoading(true);
-      
+      setError("");
+      setOperationLoading(prev => ({ ...prev, register: true }));
+
       const response = await authAPI.register(userData);
       return { success: true, data: response };
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || 'Registration failed. Please try again.';
+      const errorMessage = error.response?.data?.detail 
+        || "Registration failed. Please try again.";
+      
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
-      setLoading(false);
+      setOperationLoading(prev => ({ ...prev, register: false }));
     }
   };
 
   const logout = async () => {
     try {
+      setOperationLoading(prev => ({ ...prev, logout: true }));
+      
       if (user) {
         await authAPI.logout();
       }
     } catch (error) {
-      console.error('Logout API error:', error);
+      console.error("Logout API error:", error);
     } finally {
       setUser(null);
-      setError('');
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
+      setError("");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user");
+      setOperationLoading(prev => ({ ...prev, logout: false }));
     }
   };
 
   const requestPasswordReset = async (email) => {
     try {
-      setError('');
+      setError("");
       const response = await authAPI.requestPasswordReset(email);
       return { success: true, data: response };
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || 'Failed to request password reset.';
+      const errorMessage = error.response?.data?.detail 
+        || "Failed to request password reset.";
+      
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
@@ -191,11 +223,17 @@ export const AuthProvider = ({ children }) => {
 
   const resetPassword = async (token, newPassword, confirmPassword) => {
     try {
-      setError('');
-      const response = await authAPI.resetPassword(token, newPassword, confirmPassword);
+      setError("");
+      const response = await authAPI.resetPassword(
+        token,
+        newPassword,
+        confirmPassword
+      );
       return { success: true, data: response };
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || 'Failed to reset password.';
+      const errorMessage = error.response?.data?.detail 
+        || "Failed to reset password.";
+      
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
@@ -203,27 +241,30 @@ export const AuthProvider = ({ children }) => {
 
   const resendVerification = async (email) => {
     try {
-      setError('');
+      setError("");
       const response = await authAPI.resendVerification(email);
       return { success: true, data: response };
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || 'Failed to resend verification email.';
+      const errorMessage = error.response?.data?.detail 
+        || "Failed to resend verification email.";
+      
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
   };
 
-  const clearError = () => setError('');
+  const clearError = () => setError("");
 
   const updateUser = (updatedUserData) => {
     const enhancedUser = enhanceUserWithRoleProperties(updatedUserData);
     setUser(enhancedUser);
-    localStorage.setItem('user', JSON.stringify(enhancedUser));
+    localStorage.setItem("user", JSON.stringify(enhancedUser));
   };
 
   const value = {
     user,
-    loading,
+    loading: initialLoading,
+    operationLoading,
     error,
     login,
     register,
@@ -238,11 +279,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export default AuthContext;

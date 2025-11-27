@@ -220,46 +220,41 @@ const AdminDashboard = () => {
       setActionLoading((prev) => ({ ...prev, [userId]: false }));
     }
   };
+const handleReportAction = async (reportId, action, data = null) => {
+  try {
+    setActionLoading((prev) => ({ ...prev, [reportId]: true }));
 
-  const handleReportAction = async (reportId, action, data = null) => {
-    try {
-      setActionLoading((prev) => ({ ...prev, [reportId]: true }));
-
-      switch (action) {
-        case "delete":
-          if (
-            window.confirm(
-              "Are you sure you want to delete this report? This will remove it from the system."
-            )
-          ) {
-            await reportService.deleteReport(reportId);
-            showSuccess("Report deleted successfully", "Report Management");
-          }
-          break;
-        case "update_status":
-          await reportService.updateReportStatus(reportId, data.status);
-          showSuccess(
-            `Report status updated to ${data.status}`,
-            "Status Updated"
-          );
-          break;
-        default:
-          console.warn("Unknown report action:", action);
-      }
-
-      await loadAdminData();
-    } catch (error) {
-      console.error("Report action failed:", error);
-      showError(
-        `Failed to ${action} report: ${
-          error.response?.data?.detail || error.message
-        }`,
-        "Action Failed"
-      );
-    } finally {
-      setActionLoading((prev) => ({ ...prev, [reportId]: false }));
+    switch (action) {
+      case "delete":
+        // KEEP THIS - professional confirmation for destructive actions
+        if (
+          window.confirm(
+            "Are you sure you want to delete this report? This will remove it from the system."
+          )
+        ) {
+          await reportService.deleteReport(reportId);
+          // Removed: showSuccess("Report deleted successfully", "Report Management");
+          console.log("ReportService: Report deleted successfully");
+        }
+        break;
+      case "update_status":
+        await reportService.updateReportStatus(reportId, data.status);
+        // Removed: showSuccess(`Report status updated to ${data.status}`, "Status Updated");
+        console.log(`ReportService: Report status updated to ${data.status}`);
+        break;
+      default:
+        console.warn("Unknown report action:", action);
     }
-  };
+
+    await loadAdminData();
+  } catch (error) {
+    console.error("Report action failed:", error);
+    // Removed: showError alert
+    console.error(`ReportService: Failed to ${action} report: ${error.response?.data?.detail || error.message}`);
+  } finally {
+    setActionLoading((prev) => ({ ...prev, [reportId]: false }));
+  }
+};
 
   const filteredReports = reports.filter((report) => {
     const matchesSearch =

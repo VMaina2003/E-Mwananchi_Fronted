@@ -112,6 +112,19 @@ const DetailsSection = ({
     }
   };
 
+  const handleAnonymousToggle = (e) => {
+    const isAnonymous = e.target.checked;
+    setFormData(prev => ({
+      ...prev,
+      is_anonymous: isAnonymous,
+      anonymous_display_name: isAnonymous ? 'Anonymous Citizen' : ''
+    }));
+  };
+
+  const handleAnonymousNameChange = (e) => {
+    setFormData(prev => ({ ...prev, anonymous_display_name: e.target.value }));
+  };
+
   const enableAIAnalysis = () => {
     setAnalysisEnabled(true);
     setShowAIPanel(true);
@@ -299,6 +312,74 @@ const DetailsSection = ({
           ) : null}
         </div>
       )}
+
+      {/* Anonymous Reporting Section */}
+      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-medium text-gray-900">Privacy Settings</h3>
+            <p className="text-sm text-gray-600">Control how your information appears publicly</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.is_anonymous || false}
+              onChange={handleAnonymousToggle}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+
+        {formData.is_anonymous ? (
+          <div className="space-y-3">
+            <div className="flex items-center p-3 bg-white rounded border border-blue-300">
+              <div className="text-blue-500 mr-3">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-800">Anonymous Reporting Active</p>
+                <p className="text-xs text-blue-600">
+                  Your name will be hidden from public view. Officials will still see your contact information for follow-up.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Display Name (Optional)
+              </label>
+              <input
+                type="text"
+                value={formData.anonymous_display_name || ''}
+                onChange={handleAnonymousNameChange}
+                placeholder="Anonymous Citizen"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                maxLength={50}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                This name will be shown publicly instead of your real name. Leave blank for "Anonymous Citizen".
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center p-3 bg-white rounded border border-gray-300">
+            <div className="text-gray-500 mr-3">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-800">Standard Reporting</p>
+              <p className="text-xs text-gray-600">
+                Your name will be visible to the public and county officials.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Title Input */}
       <div className="mb-6">

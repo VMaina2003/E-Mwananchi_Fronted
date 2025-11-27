@@ -1,4 +1,4 @@
-// src/pages/reports/CreateReport.jsx
+// src/pages/reports/CreateReport.jsx - PRODUCTION READY
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
@@ -6,26 +6,15 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/common/Layout';
 import CreateReportForm from '../../components/reports/CreateReportForm/index';
 
-/**
- * CreateReport Page Component
- * 
- * Professional, production-ready report creation page with:
- * - Authentication and authorization checks
- * - Enhanced typography and layout
- * - Professional styling and UX
- * - Mobile-responsive design
- * - Accessibility compliance
- * - Modern notification system
- */
 const CreateReport = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const { showSuccess, showError, showInfo, showWarning } = useNotification();
+  const { showSuccess, showError, showInfo } = useNotification();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Authentication and authorization guard
   useEffect(() => {
-    if (isLoading) return; // Wait for auth check to complete
+    if (isLoading) return;
 
     if (!isAuthenticated || !user) {
       showInfo('Please log in to create a report', 'Authentication Required');
@@ -44,7 +33,6 @@ const CreateReport = () => {
     }
   }, [isAuthenticated, user, isLoading, navigate, showInfo, showError]);
 
-  // Submission state handlers
   const handleSubmissionStart = () => {
     setIsSubmitting(true);
     showInfo('Processing your report...', 'Submitting Report');
@@ -55,26 +43,24 @@ const CreateReport = () => {
     
     if (success && reportId) {
       showSuccess(
-        'Your report has been successfully submitted and is being processed',
+        'Your report has been successfully submitted and is being processed. You will receive email confirmation shortly.',
         'Report Created Successfully'
       );
       
-      // Redirect to report detail page on success
       setTimeout(() => {
         navigate(`/reports/${reportId}`, { 
           replace: true,
           state: { created: true }
         });
-      }, 2000);
-    } else if (errorMessage) {
+      }, 3000);
+    } else {
       showError(
-        errorMessage || 'Failed to submit report. Please try again.',
+        errorMessage || 'Failed to submit report. Please check your connection and try again.',
         'Submission Failed'
       );
     }
   };
 
-  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <Layout>
@@ -88,29 +74,23 @@ const CreateReport = () => {
     );
   }
 
-  // Don't render if not authenticated (will redirect in useEffect)
   if (!isAuthenticated || !user) {
     return null;
   }
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 py-8">
+      <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Header Section */}
           <header className="text-center mb-12">
-            {/* Icon */}
-            <div 
-              className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg mb-6 transition-transform hover:scale-105 duration-200"
-              aria-hidden="true"
-            >
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-green-600 rounded-2xl shadow-lg mb-6">
               <svg 
                 className="w-10 h-10 text-white" 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
-                aria-hidden="true"
               >
                 <path 
                   strokeLinecap="round" 
@@ -121,20 +101,17 @@ const CreateReport = () => {
               </svg>
             </div>
             
-            {/* Main Title */}
-            <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4 tracking-tight">
+            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
               Report Community Issue
             </h1>
             
-            {/* Subtitle */}
-            <p className="text-xl lg:text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed mb-6">
+            <p className="text-lg lg:text-xl text-gray-600 max-w-4xl mx-auto mb-6">
               Help improve your community by reporting issues that need attention. 
               Your report will be automatically analyzed and forwarded to the relevant county department.
             </p>
 
-            {/* User Welcome Banner */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 inline-block max-w-2xl">
-              <p className="text-lg text-gray-700">
+            <div className="bg-white rounded-lg border border-gray-200 p-6 inline-block max-w-2xl">
+              <p className="text-gray-700">
                 Welcome, <span className="font-semibold text-green-600 capitalize">{user.first_name || user.email}</span>! 
                 <span className="text-gray-500 ml-2 capitalize">
                   You're reporting as a {user.role?.replace(/_/g, ' ')}
@@ -146,22 +123,15 @@ const CreateReport = () => {
 
           {/* Submission Progress Overlay */}
           {isSubmitting && (
-            <div 
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300"
-              role="alert"
-              aria-live="polite"
-            >
-              <div className="bg-white rounded-2xl p-8 mx-4 max-w-md w-full shadow-2xl">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl p-8 mx-4 max-w-md w-full shadow-2xl">
                 <div className="flex items-center space-x-4">
-                  <div 
-                    className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 flex-shrink-0"
-                    aria-hidden="true"
-                  ></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 flex-shrink-0"></div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 mb-2">
                       Processing Your Report
                     </h3>
-                    <p className="text-gray-600 text-lg">
+                    <p className="text-gray-600">
                       AI is analyzing your report and assigning it to the right department...
                     </p>
                   </div>
@@ -171,36 +141,46 @@ const CreateReport = () => {
           )}
 
           {/* Features Grid */}
-          <section 
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10"
-            aria-label="Report submission features"
-          >
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-shadow duration-200">
-              <div className="text-2xl mb-3" aria-hidden="true">🤖</div>
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 AI-Powered Analysis
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 text-sm">
                 Smart categorization and automatic department assignment
               </p>
             </div>
             
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-shadow duration-200">
-              <div className="text-2xl mb-3" aria-hidden="true">📍</div>
+            <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Location-Based Routing
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 text-sm">
                 Automatically forwarded to your county officials
               </p>
             </div>
             
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-shadow duration-200">
-              <div className="text-2xl mb-3" aria-hidden="true">📊</div>
+            <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Progress Tracking
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 text-sm">
                 Real-time updates on your report's status
               </p>
             </div>
@@ -208,22 +188,18 @@ const CreateReport = () => {
 
           {/* Main Form Container */}
           <main>
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-              {/* Form Header */}
-              <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 lg:px-8 py-6 lg:py-8">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="bg-green-600 px-6 lg:px-8 py-6">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div>
                     <h2 className="text-2xl lg:text-3xl font-bold text-white mb-2">
                       Create New Report
                     </h2>
-                    <p className="text-green-100 text-lg">
+                    <p className="text-green-100">
                       Provide detailed information about the issue you've observed
                     </p>
                   </div>
-                  <div 
-                    className="flex items-center space-x-2 bg-green-500 bg-opacity-20 px-4 py-2 rounded-full self-start lg:self-auto"
-                    aria-label="Progress: Step 1 of 4"
-                  >
+                  <div className="bg-green-500 bg-opacity-20 px-4 py-2 rounded-full">
                     <span className="text-green-100 text-sm font-medium">
                       Step 1 of 4
                     </span>
@@ -231,20 +207,14 @@ const CreateReport = () => {
                 </div>
               </div>
 
-              {/* Form Content */}
               <div className="p-6 lg:p-8">
-                {/* Important Notice */}
-                <div 
-                  className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-8"
-                  role="alert"
-                >
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
                   <div className="flex items-start space-x-3">
                     <svg 
                       className="w-6 h-6 text-yellow-600 mt-0.5 flex-shrink-0" 
                       fill="none" 
                       stroke="currentColor" 
                       viewBox="0 0 24 24"
-                      aria-hidden="true"
                     >
                       <path 
                         strokeLinecap="round" 
@@ -257,7 +227,7 @@ const CreateReport = () => {
                       <h3 className="text-lg font-semibold text-yellow-800 mb-2">
                         Before You Report
                       </h3>
-                      <ul className="text-yellow-700 space-y-1 text-base list-disc list-inside">
+                      <ul className="text-yellow-700 space-y-1 text-sm list-disc list-inside">
                         <li>Provide clear, specific details about the issue</li>
                         <li>Include photos as evidence when possible</li>
                         <li>Be accurate with location information</li>
@@ -267,7 +237,6 @@ const CreateReport = () => {
                   </div>
                 </div>
 
-                {/* Form Component */}
                 <CreateReportForm 
                   onSubmissionStart={handleSubmissionStart}
                   onSubmissionComplete={handleSubmissionComplete}
@@ -278,7 +247,7 @@ const CreateReport = () => {
           </main>
 
           {/* Support Information */}
-          <footer className="mt-12 bg-white rounded-2xl border border-gray-200 p-6 lg:p-8">
+          <footer className="mt-12 bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-start space-x-4">
               <div className="flex-shrink-0">
                 <svg 
@@ -286,7 +255,6 @@ const CreateReport = () => {
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
-                  aria-hidden="true"
                 >
                   <path 
                     strokeLinecap="round" 
@@ -300,7 +268,7 @@ const CreateReport = () => {
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">
                   Need Help Reporting?
                 </h3>
-                <div className="text-gray-700 space-y-3 text-base">
+                <div className="text-gray-700 space-y-3">
                   <p>
                     <strong className="font-semibold">What to include:</strong> Clear description, 
                     specific location, photos if available, and any relevant details about the issue's impact.

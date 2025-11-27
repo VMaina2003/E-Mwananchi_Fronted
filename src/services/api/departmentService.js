@@ -1,23 +1,33 @@
-// src/services/api/departmentService.js
+// src/services/api/departmentService.js - UPDATED
 import api from './api';
 
 class DepartmentService {
-  /**
-   * Get all departments
-   */
   async getDepartments() {
     try {
       const response = await api.get('/department/departments/');
-      return response.data;
+      
+      // Handle different response formats
+      let departmentsData = [];
+      
+      if (Array.isArray(response.data)) {
+        departmentsData = response.data;
+      } else if (response.data.results && Array.isArray(response.data.results)) {
+        departmentsData = response.data.results;
+      } else if (response.data.data && Array.isArray(response.data.data)) {
+        departmentsData = response.data.data;
+      } else {
+        console.warn('Unexpected departments API response format:', response.data);
+        departmentsData = [];
+      }
+      
+      console.log(`Loaded ${departmentsData.length} departments`);
+      return departmentsData;
     } catch (error) {
       console.error('Error fetching departments:', error.response?.data || error.message);
-      throw error;
+      return [];
     }
   }
 
-  /**
-   * Get county departments with filtering
-   */
   async getCountyDepartments(params = {}) {
     try {
       const response = await api.get('/department/county-departments/', { params });
@@ -27,20 +37,6 @@ class DepartmentService {
       throw error;
     }
   }
-
-  /**
-   * Create department
-   */
-  async createDepartment(departmentData) {
-    try {
-      const response = await api.post('/department/departments/', departmentData);
-      return response.data;
-    } catch (error) {
-      console.error('Error creating department:', error.response?.data || error.message);
-      throw error;
-    }
-  }
-
   /**
    * Update department
    */
